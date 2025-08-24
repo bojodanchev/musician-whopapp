@@ -2,7 +2,8 @@ import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().url(),
+  // Make optional at build-time; assert at runtime when needed
+  DATABASE_URL: z.string().url().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
   USE_MOCK_MUSIC: z.string().optional(),
   STORAGE_PROVIDER: z.enum(["s3", "supabase"]).default("s3").optional(),
@@ -33,4 +34,11 @@ export const env: Env = envSchema.parse({
 });
 
 export const isMockMusic = env.USE_MOCK_MUSIC === "1" || env.NODE_ENV !== "production";
+
+export function assertDatabaseUrl(): string {
+  if (!env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required at runtime but was not set");
+  }
+  return env.DATABASE_URL;
+}
 
