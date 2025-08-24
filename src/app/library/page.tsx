@@ -1,10 +1,11 @@
 export const dynamic = "force-dynamic";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { Download, Shield } from "lucide-react";
 import { getStorage } from "@/lib/storage/s3";
 
 export default async function LibraryPage() {
+  const prisma = getPrisma();
   const assets = await prisma.asset.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
   let rows = assets.map((a) => ({
     ...a,

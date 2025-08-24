@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getMusicClient } from "@/lib/music/elevenlabs";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { decrementCreditsAtomically } from "@/lib/credits";
 
 const composeSchema = z.object({
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     const parsed = composeSchema.parse(body);
 
     // TODO: replace with real auth session lookup
+    const prisma = getPrisma();
     const user = await prisma.user.findFirst();
     if (!user) return NextResponse.json<ErrorBody>({ error: "UNAUTHENTICATED" }, { status: 401 });
 

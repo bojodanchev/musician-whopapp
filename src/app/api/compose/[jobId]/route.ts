@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { getMusicClient } from "@/lib/music/elevenlabs";
 import { getStorage } from "@/lib/storage/s3";
 import { normalizeLoudness, renderLoopVersion } from "@/lib/processing/audio";
@@ -7,6 +7,7 @@ import { zipBuffers } from "@/lib/processing/zip";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await ctx.params;
+  const prisma = getPrisma();
   const job = await prisma.job.findUnique({ where: { id: jobId } });
   if (!job) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
 

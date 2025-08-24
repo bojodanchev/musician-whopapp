@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { getStorage } from "@/lib/storage/s3";
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ assetId: string }> }) {
   const { assetId } = await ctx.params;
+  const prisma = getPrisma();
   const asset = await prisma.asset.findUnique({ where: { id: assetId }, include: { user: true } });
   if (!asset) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   const storage = getStorage();

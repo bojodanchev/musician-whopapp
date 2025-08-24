@@ -1,6 +1,7 @@
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 
 export async function decrementCreditsAtomically(userId: string, amount: number) {
+  const prisma = getPrisma();
   return await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error("User not found");
