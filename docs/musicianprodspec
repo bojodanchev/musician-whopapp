@@ -1,0 +1,259 @@
+Musician – Whop‑native AI Music Generator
+
+A dynamic, elegant Whop app using ElevenLabs Music API to generate short‑form, rights‑cleared music hooks, loops, and stems for creators and communities.
+
+1) Product overview
+
+Name: Musician
+One‑liner: Generate hooks, loops, and stems in seconds. Built for TikTok/Reels, podcasts, ads, and editors.
+Primary user: Whop community owners and their members; solo creators/editors.
+Core value: On‑demand, safe‑to‑use music without leaving Whop, credit‑metered, with batch and presets.
+
+2) Goals and non‑goals
+
+Goals
+
+Zero‑to‑music in < 30 seconds with presets
+
+Batch generation with auto‑looped deliverables
+
+Clear licensing surfaced in‑app
+
+Whop entitlements map to credits and features
+
+Elegant, ElevenLabs‑inspired visual polish, but Whop‑native
+
+Non‑goals (MVP)
+
+Full DAW editing
+
+Long‑form tracks > 2 minutes
+
+Complex collaboration features
+
+3) Personas
+
+Creator/Editor: needs endless background hooks, quick export, zero rights risk.
+
+Community Owner: wants credits pooled for members; rev‑share; frictionless install.
+
+4) UX flows (high level)
+
+Sign in via Whop → read entitlements/plan → show credits.
+
+Generate: choose preset or custom (vibe, BPM, duration, structure, seed, batch, stems) → compose job → poll → deliver files (WAV/MP3, looped version, optional stems) + license.txt.
+
+Library: browse, preview, download WAV/ZIP, copy license.
+
+Upgrade: go to Whop pricing; on return, refresh entitlements and credits.
+
+5) Visual design system
+
+Theme: Dark, glassy, minimal motion.
+Gradient: Purple → Pink → Blue (from #7b5cff → #ff4d9d → #35a1ff).
+Components: rounded‑2xl/3xl cards, soft borders border-white/10, translucent fills bg-white/5, subtle shadows.
+Motion: Framer Motion fades and small y‑offset reveals; fast, no bouncy easing.
+Icons: lucide-react but avoid icons that require CDN sub‑paths. Use: Music, Sparkles, Clock, Gauge, Download, PlayCircle, SlidersHorizontal, BookOpen, CreditCard, Shield. Do not import Waveform.
+Typography: system stack; medium/semibold headings; subdued body text-white/70.
+
+6) Feature spec (MVP)
+
+Prompt‑to‑track: fields for vibe, bpm, durationSeconds, structure, optional seed.
+
+Presets: Gym Trap 140, Cozy Lofi 85, Cinematic Ad 120.
+
+Batch mode: N variations (1–10).
+
+Stems toggle: request stems when plan allows.
+
+Auto‑looped render: create loop‑friendly version; store both.
+
+Library: table/grid with title, BPM, key, duration, created, actions: Play, Download WAV, Download Stems (ZIP), License.
+
+Credits meter: visible in header; decremented per variation in batch.
+
+Licensing: inline notice near Generate; license.txt per asset with rights summary.
+
+Diagnostics & Tests panel: run basic logic tests client‑side for sanity.
+
+7) API integration
+
+ElevenLabs Music API
+
+POST /v1/music/generate (representative) with payload: { prompt, bpm, duration, structure, seed, stems, variations }
+
+Returns a job id; poll GET /v1/music/jobs/:id until status = completed then pull asset URLs.
+
+Respect safety: block artist‑name prompts; reject copyrighted lyric text.
+
+Backend responsibilities
+
+Server route /api/compose accepts UI form, validates, creates job with ElevenLabs, polls, downloads assets to storage, persists records, decrements credits atomically.
+
+Create looped version and optional stems ZIP.
+
+Return final asset URLs and metadata to client.
+
+8) Data model
+
+Tables
+
+users (id, whop_user_id, username, plan, credits, created_at)
+
+assets (id, user_id, title, bpm, key, duration, created_at, wav_url, loop_url, stems_zip_url, license_url, job_id)
+
+jobs (id, user_id, payload_json, status, error, created_at, completed_at)
+
+events (id, user_id, type, payload_json, created_at)
+
+Credit policy
+
+1 variation = 1 credit. Batch of 5 costs 5 credits. Prevent negative balances.
+
+9) Plans and entitlements
+
+Starter $29/mo: 150 credits, 30s max, loops only.
+
+Pro $79/mo: 600 credits, stems, batch up to 10.
+
+Studio $199/mo: 2000 credits, team seats (x5), webhook/API.
+
+Overages: $7 per 100 credits.
+
+Whop entitlements define plan, credits_cap, feature flags.
+
+10) Routes and components
+
+Frontend (Next.js)
+
+/ Generator + Status + Presets
+
+/library Asset grid
+
+/pricing Plans (links back to Whop checkout)
+
+/docs Minimal how‑to + licensing notes
+
+Key components
+
+GeneratorCard
+
+PresetButtons
+
+StatusCard
+
+LibraryGrid
+
+PricingCards
+
+AudioPlayer (inline audio tag first; waveform later)
+
+11) API contracts (internal)
+
+POST /api/compose
+Request: { vibe: string, bpm: number, duration: number, structure: string, seed?: string, batch: number, stems: boolean }
+Response: { jobId: string }
+
+GET /api/compose/:jobId
+Response on completion: { assets: Array<{ id, title, bpm, key, duration, wavUrl, loopUrl, stemsZipUrl?, licenseUrl }> }
+
+**POST /api/licenses/:assetId** Response: { licenseTxtUrl }`
+
+12) Validation and safety
+
+Clamp BPM to 40–220, duration to 5–120s.
+
+Block prompts containing known artist names or copyrighted song titles.
+
+Surface rights note near Generate; license.txt contains plan‑based usage explainers.
+
+13) Error handling
+
+Compose job failures show toast and detailed error in Status card; no credit decrement on failed jobs.
+
+Network/API timeouts backoff‑retry; show spinner and ETA.
+
+Graceful degradation if storage write fails.
+
+14) Storage and processing
+
+Storage: S3 or Supabase for wav, loop, stems.zip, license.txt.
+
+Processing worker: loudness normalization, loop point selection, ZIP stems.
+
+15) Security
+
+Only store Whop user id + minimal profile.
+
+Sign all download URLs; short TTL.
+
+Server‑side credit decrement and plan enforcement.
+
+16) Analytics
+
+Events: generate_requested, generate_completed, download_wav, download_stems, license_opened, upgrade_click.
+
+Track preset usage to inform future preset packs.
+
+17) Testing
+
+Client logic tests (present in UI Diagnostics):
+
+clamp() boundaries.
+
+Credit decrement per variation; never below zero.
+
+Presets length ≥ 3.
+
+Server tests (to add):
+
+Credits decrement atomicity under concurrent compose.
+
+Zero credits blocks generation.
+
+License generation includes plan and timestamps.
+
+18) Known constraints and decisions
+
+CDN icon issue: Avoid lucide-react icons that resolve to CDN sub‑paths (e.g., Waveform). Use the safe icon set listed above.
+
+Default credit policy: 1 variation = 1 credit.
+
+Player: Start with native audio tag; waveform can be added later if needed.
+
+19) Open questions (awaiting product owner)
+
+Play behavior: inline waveform scrubbing with loop‑on by default, or simple audio tag for MVP
+
+Stems download: deliver as ZIP or modal with individual files
+
+License button: direct download license.txt or modal preview
+
+Team seats: how should credits be pooled for Studio plan
+
+20) Environment configuration
+ELEVENLABS_API_KEY=...
+STORAGE_BUCKET=...
+DATABASE_URL=...
+WHOP_APP_ID=...
+WHOP_APP_SECRET=...
+JWT_SECRET=...
+21) Deploy
+
+Vercel for Next.js front; background worker on serverless cron or a lightweight queue worker.
+
+Connect custom domain or Whop embedded surface.
+
+22) Licensing copy (draft)
+
+"Audio generated via ElevenLabs Music. Commercial use permitted under your active plan. Broadcast/TV/radio or large‑scale campaigns may require enterprise licensing. Do not prompt artist names or copyrighted lyrics."
+
+23) Current UI scaffold notes
+
+React + Tailwind + Framer Motion page implemented.
+
+Generator card, quick presets, status panel, library grid, pricing strip.
+
+Helpers: clamp, simulateCreditDecrement.
+
+Diagnostics & Tests panel renders PASS/FAIL.
