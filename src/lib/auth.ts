@@ -5,13 +5,12 @@ import type { NextRequest } from "next/server";
 
 export type VerifiedWhop = {
   userId: string;
-  experienceId?: string;
   accessLevel?: string;
 };
 
 export async function verifyWhopFromRequest(req: NextRequest): Promise<VerifiedWhop> {
-  const { userId, experienceId, accessLevel } = await whopSdk.verifyUserToken(req.headers);
-  return { userId, experienceId, accessLevel };
+  const { userId, accessLevel } = await whopSdk.verifyUserToken(req.headers);
+  return { userId, accessLevel };
 }
 
 export async function getOrCreateUserByWhopId(whopUserId: string) {
