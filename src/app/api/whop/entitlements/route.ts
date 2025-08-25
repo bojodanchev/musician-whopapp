@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { getWhopClient } from "@/lib/whop";
 
 export async function GET(req: NextRequest) {
@@ -7,8 +6,7 @@ export async function GET(req: NextRequest) {
     const experienceId = req.nextUrl.searchParams.get("experienceId");
     if (!experienceId) return NextResponse.json({ error: "MISSING_EXPERIENCE" }, { status: 400 });
     const whop = getWhopClient();
-    const hdrs = headers();
-    const { userId } = await whop.verifyUserToken(hdrs);
+    const { userId } = await whop.verifyUserToken(req.headers);
     const result = await whop.access.checkIfUserHasAccessToExperience({ userId, experienceId });
     return NextResponse.json({ hasAccess: result.hasAccess, accessLevel: result.accessLevel });
   } catch (e: unknown) {
