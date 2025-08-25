@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getMusicClient } from "@/lib/music/elevenlabs";
 import { getPrisma } from "@/lib/prisma";
 import { decrementCreditsAtomically } from "@/lib/credits";
-import { verifyWhopFromRequest, getOrCreateUserByWhopId } from "@/lib/auth";
+import { verifyWhopFromRequest, getOrCreateAndSyncUser } from "@/lib/auth";
 
 const composeSchema = z.object({
   vibe: z.string().min(1),
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     const prisma = getPrisma();
     const verified = await verifyWhopFromRequest(req);
-    const user = await getOrCreateUserByWhopId(verified.userId);
+    const user = await getOrCreateAndSyncUser(verified.userId, verified.accessLevel);
 
     // credits: 1 per variation
     try {
