@@ -7,8 +7,10 @@ export const whopSdk = WhopServerSdk({
   companyId: process.env.NEXT_PUBLIC_WHOP_COMPANY_ID,
 });
 
-export function getWhopClient() {
-  return whopSdk as any;
+export type WhopClient = typeof whopSdk;
+
+export function getWhopClient(): WhopClient {
+  return whopSdk;
 }
 
 export const whopPublic = {
