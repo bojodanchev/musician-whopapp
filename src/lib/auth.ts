@@ -1,5 +1,5 @@
 import { whopSdk } from "@/lib/whop";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { Plan } from "@prisma/client";
 import type { NextRequest } from "next/server";
 
@@ -15,6 +15,7 @@ export async function verifyWhopFromRequest(req: NextRequest): Promise<VerifiedW
 }
 
 export async function getOrCreateUserByWhopId(whopUserId: string) {
+  const prisma = getPrisma();
   const user = await prisma.user.upsert({
     where: { whopUserId },
     create: {
@@ -37,6 +38,7 @@ function mapPlanFromAccess(accessLevel?: string): { plan: Plan; startingCredits:
 
 export async function getOrCreateAndSyncUser(whopUserId: string, accessLevel?: string) {
   const mapped = mapPlanFromAccess(accessLevel);
+  const prisma = getPrisma();
   const existing = await prisma.user.findUnique({ where: { whopUserId } });
   if (!existing) {
     return prisma.user.create({
