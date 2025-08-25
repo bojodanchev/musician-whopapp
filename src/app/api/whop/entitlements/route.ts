@@ -8,8 +8,9 @@ export async function GET(req: NextRequest) {
     const whop = getWhopClient();
     const ent = await whop.entitlements.list({ user_id: userId, limit: 50 });
     return NextResponse.json({ entitlements: ent.data ?? [] });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message ?? "WHOP_ERROR" }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "WHOP_ERROR";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
