@@ -10,7 +10,8 @@ export default async function LibraryPage() {
   const prisma = getPrisma();
   let whopUserId: string | null = null;
   try {
-    const verified = await whopSdk.verifyUserToken(headers());
+    const hdrs = await headers();
+    const verified = await whopSdk.verifyUserToken(hdrs);
     whopUserId = verified.userId;
   } catch {}
   const where = whopUserId ? { user: { whopUserId } } : undefined;
