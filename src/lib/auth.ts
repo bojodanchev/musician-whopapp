@@ -9,8 +9,8 @@ export type VerifiedWhop = {
 };
 
 export async function verifyWhopFromRequest(req: NextRequest): Promise<VerifiedWhop> {
-  const { userId, accessLevel } = await whopSdk.verifyUserToken(req.headers);
-  return { userId, accessLevel };
+  const { userId } = await whopSdk.verifyUserToken(req.headers);
+  return { userId };
 }
 
 export async function getOrCreateUserByWhopId(whopUserId: string) {
