@@ -8,7 +8,6 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const appId = process.env.NEXT_PUBLIC_WHOP_APP_ID;
   return (
     <html lang="en" className="dark">
       <body className="bg-[#0b0b12] text-white/90 antialiased">
