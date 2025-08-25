@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getMusicClient } from "@/lib/music/elevenlabs";
 import { getPrisma } from "@/lib/prisma";
 import { decrementCreditsAtomically } from "@/lib/credits";
+import { verifyWhopFromRequest, getOrCreateUserByWhopId } from "@/lib/auth";
 
 const composeSchema = z.object({
   vibe: z.string().min(1),
@@ -21,10 +22,9 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as unknown;
     const parsed = composeSchema.parse(body);
 
-    // TODO: replace with real auth session lookup
     const prisma = getPrisma();
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json<ErrorBody>({ error: "UNAUTHENTICATED" }, { status: 401 });
+    const verified = await verifyWhopFromRequest(req);
+    const user = await getOrCreateUserByWhopId(verified.userId);
 
     // credits: 1 per variation
     try {

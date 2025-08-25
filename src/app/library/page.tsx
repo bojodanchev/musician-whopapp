@@ -3,10 +3,18 @@ import Link from "next/link";
 import { getPrisma } from "@/lib/prisma";
 import { Download, Shield } from "lucide-react";
 import { getStorage } from "@/lib/storage/s3";
+import { whopSdk } from "@/lib/whop";
+import { headers } from "next/headers";
 
 export default async function LibraryPage() {
   const prisma = getPrisma();
-  const assets = await prisma.asset.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
+  let whopUserId: string | null = null;
+  try {
+    const verified = await whopSdk.verifyUserToken(headers());
+    whopUserId = verified.userId;
+  } catch {}
+  const where = whopUserId ? { user: { whopUserId } } : undefined;
+  const assets = await prisma.asset.findMany({ where, orderBy: { createdAt: "desc" }, take: 50 });
   let rows = assets.map((a) => ({
     ...a,
     wavSigned: { url: a.wavUrl },
