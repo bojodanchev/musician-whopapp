@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getMusicClient } from "@/lib/music/elevenlabs";
 import { getPrisma } from "@/lib/prisma";
 import { decrementCreditsAtomically } from "@/lib/credits";
 import { verifyWhopFromRequest, getOrCreateAndSyncUser } from "@/lib/auth";
+import { getStorage } from "@/lib/storage/s3";
+import { normalizeLoudness, renderLoopVersion } from "@/lib/processing/audio";
+import { env } from "@/lib/env";
 
 const composeSchema = z.object({
   vibe: z.string().min(1),
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const prisma = getPrisma();
     const verified = await verifyWhopFromRequest(req);
-    const user = await getOrCreateAndSyncUser(verified.userId, verified.accessLevel);
+    const user = await getOrCreateAndSyncUser(verified.userId, undefined);
 
     // credits: 1 per variation
     try {
@@ -37,27 +39,61 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
-    const music = getMusicClient();
-    const { jobId } = await music.createGenerateJob({
-      prompt: parsed.vibe,
-      bpm: parsed.bpm,
-      duration: parsed.duration,
-      structure: parsed.structure,
-      seed: parsed.seed,
-      stems: parsed.stems,
-      variations: parsed.batch,
-    });
+    // Direct compose against ElevenLabs and return assets immediately
+    if (!env.ELEVENLABS_API_KEY) {
+      return NextResponse.json<ErrorBody>({ error: "MISSING_ELEVENLABS_API_KEY" }, { status: 500 });
+    }
 
+    const storage = getStorage();
+    const assetsOut: Array<{ id: string; title: string; bpm: number; key: string | null; duration: number; wavUrl: string; loopUrl: string; stemsZipUrl?: string | null; licenseUrl: string }> = [];
+
+    // Create a Job row for traceability (COMPLETED immediately after saves)
     const job = await prisma.job.create({
-      data: {
-        id: jobId,
-        userId: user.id,
-        status: "QUEUED",
-        payloadJson: parsed,
-      },
+      data: { userId: user.id, status: "PROCESSING", payloadJson: parsed },
     });
 
-    return NextResponse.json({ jobId: job.id } as { jobId: string });
+    for (let i = 0; i < parsed.batch; i++) {
+      const composeRes = await fetch("https://api.elevenlabs.io/v1/music/compose", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "xi-api-key": env.ELEVENLABS_API_KEY,
+        },
+        body: JSON.stringify({ prompt: parsed.vibe, music_length_ms: parsed.duration * 1000 }),
+      });
+      if (!composeRes.ok) {
+        throw new Error(`ELEVENLABS_${composeRes.status}`);
+      }
+      const arrayBuf = await composeRes.arrayBuffer();
+      const audioBuf = Buffer.from(arrayBuf);
+
+      const norm = await normalizeLoudness(audioBuf);
+      const looped = await renderLoopVersion(norm);
+
+      const baseKey = `users/${user.id}/jobs/${job.id}/take_${i + 1}`;
+      await storage.putObject({ key: `${baseKey}.wav`, contentType: "audio/wav", body: norm });
+      await storage.putObject({ key: `${baseKey}_loop.wav`, contentType: "audio/wav", body: looped });
+
+      const asset = await prisma.asset.create({
+        data: {
+          userId: user.id,
+          jobId: job.id,
+          title: parsed.vibe,
+          bpm: parsed.bpm,
+          key: null,
+          duration: parsed.duration,
+          wavUrl: `${baseKey}.wav`,
+          loopUrl: `${baseKey}_loop.wav`,
+          stemsZipUrl: null,
+          licenseUrl: `${baseKey}_license.txt`,
+        },
+      });
+      assetsOut.push({ id: asset.id, title: asset.title, bpm: asset.bpm, key: asset.key, duration: asset.duration, wavUrl: asset.wavUrl, loopUrl: asset.loopUrl, stemsZipUrl: asset.stemsZipUrl, licenseUrl: asset.licenseUrl });
+    }
+
+    await prisma.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+
+    return NextResponse.json({ assets: assetsOut });
   } catch (err) {
     const message = err instanceof Error ? err.message : "UNKNOWN_ERROR";
     return NextResponse.json<ErrorBody>({ error: message }, { status: 400 });

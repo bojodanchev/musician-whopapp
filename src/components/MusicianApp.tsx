@@ -55,29 +55,41 @@ export default function MusicianApp() {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.error || `Compose failed: ${resp.status}`);
       }
-      const { jobId } = (await resp.json()) as { jobId: string };
+      const result = await resp.json();
 
-      // Poll job
-      let done = false;
-      while (!done) {
-        await new Promise((r) => setTimeout(r, 1500));
-        const st = await fetch(`/api/compose/${jobId}`, { credentials: "include" });
-        const data = (await st.json()) as JobPollResponse;
-        if ("status" in data && (data.status === "queued" || data.status === "processing")) continue;
-        if ("error" in data) throw new Error(data.error);
-        if ("assets" in data) {
-          const added = data.assets.map((a, idx) => ({
-            id: `${jobId}_${idx}`,
-            title: prompt,
-            bpm: 120,
-            key: "-",
-            duration,
-            date: "Just now",
-            url: a.loopUrl,
-          }));
-          setItems((cur) => [...added, ...cur]);
+      if ("assets" in result) {
+        const added = (result.assets as AssetOut[]).map((a, idx) => ({
+          id: a.id ?? `${Date.now()}_${idx}`,
+          title: prompt,
+          bpm: 120,
+          key: "-",
+          duration,
+          date: "Just now",
+          url: a.loopUrl,
+        }));
+        setItems((cur) => [...added, ...cur]);
+      } else if ("jobId" in result) {
+        let done = false;
+        while (!done) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const st = await fetch(`/api/compose/${result.jobId}`, { credentials: "include" });
+          const data = (await st.json()) as JobPollResponse;
+          if ("status" in data && (data.status === "queued" || data.status === "processing")) continue;
+          if ("error" in data) throw new Error(data.error);
+          if ("assets" in data) {
+            const added = data.assets.map((a, idx) => ({
+              id: `${result.jobId}_${idx}`,
+              title: prompt,
+              bpm: 120,
+              key: "-",
+              duration,
+              date: "Just now",
+              url: a.loopUrl,
+            }));
+            setItems((cur) => [...added, ...cur]);
+          }
+          done = true;
         }
-        done = true;
       }
     } catch (e) {
       console.error(e);
