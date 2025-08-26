@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < parsed.batch; i++) {
       // Optionally reuse a composition plan: create a guided plan from prompt & duration
-      let compositionPlan: any | undefined;
+      let compositionPlan: unknown | undefined;
       if (parsed.reusePlan) {
         const planRes = await fetch("https://api.elevenlabs.io/v1/music/composition-plan/create", {
           method: "POST",
