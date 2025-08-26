@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const planId = (plans as Record<string, string | undefined>)[plan.toUpperCase()];
   if (!planId) return NextResponse.json({ error: "UNKNOWN_PLAN" }, { status: 400 });
   const url = subscribeUrl(planId);
-  return NextResponse.json({ url });
+  return NextResponse.redirect(url);
 }
 
 
