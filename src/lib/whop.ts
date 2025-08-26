@@ -32,6 +32,12 @@ export const plans = {
   STUDIO: process.env.WHOP_PLAN_STUDIO_ID,
 };
 
+export const passes = {
+  STARTER: process.env.WHOP_PASS_STARTER_ID,
+  PRO: process.env.WHOP_PASS_PRO_ID,
+  STUDIO: process.env.WHOP_PASS_STUDIO_ID,
+};
+
 export async function userHasPlan(userId: string, planId: string) {
   const result = await whopSdk.access.checkIfUserHasAccessToExperience({ userId, experienceId: planId });
   return result.hasAccess;
@@ -40,5 +46,10 @@ export async function userHasPlan(userId: string, planId: string) {
 export function subscribeUrl(planId: string) {
   // Direct subscribe URL for Whop Experience
   return `https://whop.com/checkout/${planId}?app_id=${APP_ID}`;
+}
+
+export async function userHasAccessPass(userId: string, passId: string) {
+  const res = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId, accessPassId: passId });
+  return res.hasAccess;
 }
 

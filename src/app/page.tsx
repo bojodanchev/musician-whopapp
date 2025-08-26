@@ -123,9 +123,9 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
-            {name:"Starter", price:"$29/mo", features:["150 credits","30s max","Loops" ]},
-            {name:"Pro", price:"$79/mo", features:["600 credits","Batch x4","Streaming preview"]},
-            {name:"Studio", price:"$199/mo", features:["2000 credits","Batch x10","Advanced plan editor"]},
+            {name:"Starter", price:"$9.99/mo", features:["150 credits","30s max","Loops" ]},
+            {name:"Pro", price:"$29.99/mo", features:["600 credits","Batch x4","Streaming preview"]},
+            {name:"Studio", price:"$49.99/mo", features:["2000 credits","Batch x10","Advanced plan editor"]},
           ].map((p)=> (
             <div key={p.name} className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <div className="font-semibold">{p.name}</div>
