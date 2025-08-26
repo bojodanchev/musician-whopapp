@@ -42,7 +42,8 @@ export default function MusicianApp() {
   const variantsRef = useRef<HTMLDivElement | null>(null);
   const durationRef = useRef<HTMLDivElement | null>(null);
   const [plan, setPlan] = useState<"STARTER" | "PRO" | "STUDIO" | null>(null);
-  const iframeSdk = useIframeSdk?.() as any;
+  type IframeSdk = { inAppPurchase?: (opts: { planId: string }) => Promise<void> } | null;
+  const iframeSdk = (useIframeSdk?.() as unknown as IframeSdk) || null;
 
   const planCaps = {
     STARTER: { maxDuration: 30, maxBatch: 2, allowStreaming: false, allowAdvanced: false, allowVocals: false },
@@ -63,7 +64,7 @@ export default function MusicianApp() {
           await iframeSdk.inAppPurchase({ planId: planEnv });
           // Refresh diagnostics and caps after modal success; best effort
           const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
-          if (d?.whopUser?.plan || d?.plan) setPlan((d?.whopUser?.plan ?? d?.plan) as any);
+          if (d?.whopUser?.plan || d?.plan) setPlan((d?.whopUser?.plan ?? d?.plan) as "STARTER" | "PRO" | "STUDIO");
           return;
         }
       }
@@ -94,7 +95,7 @@ export default function MusicianApp() {
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+  }, [showVariants, showDuration]);
 
   const handleGenerate = async () => {
     try {

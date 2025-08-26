@@ -1,7 +1,6 @@
 import MusicianApp from "@/components/MusicianApp";
 import Diagnostics from "@/components/Diagnostics";
 import Link from "next/link";
-import { plans } from "@/lib/whop";
 
 export const dynamic = "force-dynamic";
 

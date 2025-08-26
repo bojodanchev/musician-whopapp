@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Music, PartyPopper, Calendar, User, Sparkles, PlayCircle, Download, Shield } from "lucide-react";
+import { Music, Calendar, User, Sparkles, PlayCircle, Download, Shield } from "lucide-react";
 import PlanCard from "@/components/PlanCard";
 
 export default function Home() {

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Sparkles, Heart, Music, ChevronRight } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 type Props = {
   onClose: () => void;

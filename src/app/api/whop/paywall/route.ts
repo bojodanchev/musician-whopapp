@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
     const result = await whopSdk.access.checkIfUserHasAccessToExperience({ userId, experienceId: planId });
     return NextResponse.json({ hasAccess: result.hasAccess, accessLevel: result.accessLevel });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "PAYWALL_ERROR" }, { status: 500 });
   }
 }
