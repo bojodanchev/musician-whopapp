@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight, X } from "lucide-react";
+import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight } from "lucide-react";
+import { useIframeSdk } from "@whop/react";
 import OnboardingWizard from "@/components/OnboardingWizard";
 
 function clamp(n: number, min: number, max: number) {
@@ -40,6 +41,37 @@ export default function MusicianApp() {
   const [showDuration, setShowDuration] = useState(false);
   const variantsRef = useRef<HTMLDivElement | null>(null);
   const durationRef = useRef<HTMLDivElement | null>(null);
+  const [plan, setPlan] = useState<"STARTER" | "PRO" | "STUDIO" | null>(null);
+  const iframeSdk = useIframeSdk?.() as any;
+
+  const planCaps = {
+    STARTER: { maxDuration: 30, maxBatch: 2, allowStreaming: false, allowAdvanced: false, allowVocals: false },
+    PRO: { maxDuration: 60, maxBatch: 4, allowStreaming: true, allowAdvanced: true, allowVocals: true },
+    STUDIO: { maxDuration: 120, maxBatch: 10, allowStreaming: true, allowAdvanced: true, allowVocals: true },
+  } as const;
+
+  function currentCaps() {
+    if (!plan) return planCaps.STARTER;
+    return planCaps[plan];
+  }
+
+  async function upgradeTo(target: "PRO" | "STUDIO") {
+    try {
+      if (iframeSdk && iframeSdk.inAppPurchase) {
+        const planEnv = target === "PRO" ? process.env.NEXT_PUBLIC_WHOP_PLAN_PRO_ID : process.env.NEXT_PUBLIC_WHOP_PLAN_STUDIO_ID;
+        if (planEnv) {
+          await iframeSdk.inAppPurchase({ planId: planEnv });
+          // Refresh diagnostics and caps after modal success; best effort
+          const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
+          if (d?.whopUser?.plan || d?.plan) setPlan((d?.whopUser?.plan ?? d?.plan) as any);
+          return;
+        }
+      }
+      window.location.assign(`/api/whop/subscribe?plan=${target}`);
+    } catch {
+      window.location.assign(`/api/whop/subscribe?plan=${target}`);
+    }
+  }
 
   useEffect(() => {
     // pick up preset query string if present
@@ -139,6 +171,12 @@ export default function MusicianApp() {
         const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
         if (typeof d?.credits === "number") setCreditsLeft(d.credits);
       } catch {}
+      // also get plan
+      try {
+        const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
+        if (typeof d?.credits === "number") setCreditsLeft(d.credits);
+        if (d?.whopUser?.plan || d?.plan) setPlan((d?.whopUser?.plan ?? d?.plan) as any);
+      } catch {}
     })();
   }, []);
 
@@ -203,8 +241,12 @@ export default function MusicianApp() {
                         {[1,2,3,4].map((n)=> (
                           <button
                             key={n}
-                            onClick={()=>{ setBatch(n); setShowVariants(false); }}
-                            className={`h-10 rounded-xl border ${batch===n?"bg-white/10 border-white":"bg-white/5 border-white/10 hover:bg-white/10"}`}
+                            onClick={()=>{
+                              const cap = currentCaps();
+                              if (n > cap.maxBatch) { upgradeTo(n <= 4 ? "PRO" : "STUDIO"); return; }
+                              setBatch(n); setShowVariants(false);
+                            }}
+                            className={`h-10 rounded-xl border ${batch===n?"bg-white/10 border-white":"bg-white/5 border-white/10 hover:bg-white/10"} ${n>currentCaps().maxBatch?"opacity-40 cursor-not-allowed":""}`}
                           >{n}</button>
                         ))}
                       </div>
@@ -237,7 +279,11 @@ export default function MusicianApp() {
                           {label:"1m", val:60},
                           {label:"2m", val:120},
                         ].map((o)=> (
-                          <button key={o.label} onClick={()=>{ setDuration(o.val); setShowDuration(false); }} className={`px-3 h-10 rounded-xl border ${duration===o.val?"bg-white/10 border-white":"bg-white/5 border-white/10 hover:bg-white/10"}`}>{o.label}</button>
+                          <button key={o.label} onClick={()=>{
+                            const cap = currentCaps();
+                            if (o.val > cap.maxDuration) { upgradeTo(o.val<=60?"PRO":"STUDIO"); return; }
+                            setDuration(o.val); setShowDuration(false);
+                          }} className={`px-3 h-10 rounded-xl border ${duration===o.val?"bg-white/10 border-white":"bg-white/5 border-white/10 hover:bg-white/10"} ${o.val>currentCaps().maxDuration?"opacity-40 cursor-not-allowed":""}`}>{o.label}</button>
                         ))}
                         {/* Coming soon items */}
                         {[
@@ -251,7 +297,12 @@ export default function MusicianApp() {
                             min={5}
                             max={120}
                             value={duration}
-                            onChange={(e)=> setDuration(clamp(Number(e.target.value)||30,5,120))}
+                            onChange={(e)=> {
+                              const val = clamp(Number(e.target.value)||30,5,120);
+                              const cap = currentCaps();
+                              if (val>cap.maxDuration) { upgradeTo(val<=60?"PRO":"STUDIO"); return; }
+                              setDuration(val);
+                            }}
                             className="w-20 bg-black/40 border border-white/10 rounded-xl px-2 py-1"
                           />
                           <span className="text-white/60 text-xs">Custom (s)</span>
@@ -260,6 +311,18 @@ export default function MusicianApp() {
                     </motion.div>
                   )}
                 </div>
+              </div>
+              {/* Pro/Studio toggles */}
+              <div className="flex items-center gap-3 text-xs text-white/70">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" disabled={!currentCaps().allowVocals} /> Vocals
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" disabled={!currentCaps().allowAdvanced} /> Reuse last plan
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" disabled={!currentCaps().allowStreaming} /> Streaming preview
+                </label>
               </div>
               <button
                 ref={generateBtnRef}
