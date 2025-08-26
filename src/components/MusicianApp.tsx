@@ -116,7 +116,7 @@ export default function MusicianApp() {
         }),
       });
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({} as any));
+        const err = (await resp.json().catch(() => ({}))) as { error?: string; requiredPlan?: "PRO" | "STUDIO" };
         if (resp.status === 403 && (err?.error === "FORBIDDEN_PAYWALL" || err?.error === "UPGRADE_REQUIRED")) {
           setUpgradeBanner({ requiredPlan: (err.requiredPlan || "PRO") as "PRO" | "STUDIO" });
           return;
