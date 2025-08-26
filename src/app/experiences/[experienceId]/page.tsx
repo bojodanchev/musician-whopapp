@@ -134,7 +134,7 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
           {[
             { quote: "Got a perfect 10s hook for my ad in under a minute.", name: "Lina • DTC founder" },
             { quote: "My reels finally sound pro without copyright strikes.", name: "Marco • Content creator" },
-            { quote: "Clients loved the custom jingle—closed the deal fast.", name: "Tess • Freelance editor" },
+            { quote: "Clients loved the custom jingle, closed the deal fast.", name: "Tess • Freelance editor" },
           ].map((t) => (
             <div key={t.name} className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="mb-2">“{t.quote}”</div>
@@ -148,18 +148,18 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
       <section className="mx-auto max-w-6xl px-4 pb-24">
         <h2 className="text-xl font-semibold mb-4 text-center">FAQ</h2>
         <div className="space-y-3 text-sm text-white/80">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="font-medium">Can I use the music commercially?</div>
-            <p className="text-white/70">Yes—eligible plans include a license file per asset for social/ads use.</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="font-medium">Do I need music theory?</div>
-            <p className="text-white/70">No. Describe your song in plain language; presets help you start fast.</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="font-medium">Where are files stored?</div>
-            <p className="text-white/70">We store audio securely and give you expiring download links.</p>
-          </div>
+          <details className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <summary className="font-medium cursor-pointer list-none">Can I use the music commercially?</summary>
+            <p className="text-white/70 mt-2">Yes—eligible plans include a license file per asset for social/ads use.</p>
+          </details>
+          <details className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <summary className="font-medium cursor-pointer list-none">Do I need music theory?</summary>
+            <p className="text-white/70 mt-2">No. Describe your song in plain language; presets help you start fast.</p>
+          </details>
+          <details className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <summary className="font-medium cursor-pointer list-none">Where are files stored?</summary>
+            <p className="text-white/70 mt-2">We store audio securely and give you expiring download links.</p>
+          </details>
         </div>
       </section>
     </main>
