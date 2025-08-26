@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Music,
@@ -35,7 +35,7 @@ export default function MusicianApp() {
     stems: true,
   });
   const [isGenerating, setGenerating] = useState(false);
-  const [creditsLeft, setCreditsLeft] = useState(150);
+  const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
   const [items, setItems] = useState(
     [
       { id: "t1", title: "Lofi Breeze #1", bpm: 90, key: "Amin", duration: 30, date: "Today", url: "#" },
@@ -50,27 +50,74 @@ export default function MusicianApp() {
   ];
 
   const handleGenerate = async () => {
-    setGenerating(true);
-    setTimeout(() => {
-      const id = `t${Date.now()}`;
-      const safeBpm = clamp(Number(form.bpm) || 90, 40, 220);
-      const safeDur = clamp(Number(form.duration) || 30, 5, 120);
-      setItems([
-        {
-          id,
-          title: `${form.vibe} – Take`,
-          bpm: safeBpm,
-          key: "Auto",
-          duration: safeDur,
-          date: "Just now",
-          url: "#",
-        },
-        ...items,
-      ]);
-      setCreditsLeft((c) => simulateCreditDecrement(c, form.batch));
+    try {
+      setGenerating(true);
+      const resp = await fetch("/api/compose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          vibe: form.vibe,
+          bpm: clamp(Number(form.bpm) || 90, 40, 220),
+          duration: clamp(Number(form.duration) || 30, 5, 120),
+          structure: form.structure,
+          seed: form.seeds || undefined,
+          batch: clamp(Number(form.batch) || 1, 1, 10),
+          stems: Boolean(form.stems),
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || `Compose failed: ${resp.status}`);
+      }
+      const { jobId } = (await resp.json()) as { jobId: string };
+
+      // Poll job
+      let done = false;
+      while (!done) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const st = await fetch(`/api/compose/${jobId}`, { credentials: "include" });
+        const data = (await st.json()) as any;
+        if (data.status === "queued" || data.status === "processing") continue;
+        if (data.error) throw new Error(data.error);
+        if (data.assets) {
+          const added = (data.assets as Array<any>).map((a, idx) => ({
+            id: `${jobId}_${idx}`,
+            title: `Take ${idx + 1}`,
+            bpm: form.bpm,
+            key: "-",
+            duration: form.duration,
+            date: "Just now",
+            url: a.loopUrl,
+          }));
+          setItems((cur) => [...added, ...cur]);
+          done = true;
+        } else {
+          done = true;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
       setGenerating(false);
-    }, 1200);
+      // refresh credits from diagnostics
+      try {
+        const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
+        if (typeof d?.credits === "number") setCreditsLeft(d.credits);
+      } catch {}
+    }
   };
+
+  useEffect(() => {
+    // initial credits load
+    (async () => {
+      try {
+        const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
+        if (typeof d?.credits === "number") setCreditsLeft(d.credits);
+      } catch {}
+    })();
+  }, []);
 
   const [testOutput, setTestOutput] = useState<TestResult[] | null>(null);
   function runTests() {
@@ -97,7 +144,7 @@ export default function MusicianApp() {
           </div>
           <div className="font-semibold tracking-tight">Musician</div>
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2"><CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft}</span></div>
+            <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2"><CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft ?? "-"}</span></div>
             <button className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">Upgrade</button>
             <button className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">Docs</button>
           </div>
@@ -150,7 +197,7 @@ export default function MusicianApp() {
               </div>
 
               <div className="mt-6 flex items-center gap-3">
-                <button onClick={handleGenerate} disabled={isGenerating || creditsLeft <= 0} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] shadow-lg disabled:opacity-60">
+                <button onClick={handleGenerate} disabled={isGenerating || (typeof creditsLeft === "number" && creditsLeft <= 0)} className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] shadow-lg disabled:opacity-60">
                   {isGenerating ? "Generating…" : "Generate"}
                 </button>
                 <div className="text-sm text-white/60 flex items-center gap-2">
