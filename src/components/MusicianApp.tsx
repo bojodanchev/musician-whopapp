@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Music, PlayCircle, Download, CreditCard } from "lucide-react";
+import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight, X } from "lucide-react";
 import OnboardingWizard from "@/components/OnboardingWizard";
 
 function clamp(n: number, min: number, max: number) {
@@ -36,6 +36,10 @@ export default function MusicianApp() {
   );
   const generateBtnRef = useRef<HTMLButtonElement | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showVariants, setShowVariants] = useState(false);
+  const [showDuration, setShowDuration] = useState(false);
+  const variantsRef = useRef<HTMLDivElement | null>(null);
+  const durationRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // pick up preset query string if present
@@ -51,6 +55,13 @@ export default function MusicianApp() {
     // onboarding: show once per device
     const seen = localStorage.getItem("musician_onboarded");
     if (!seen) setShowOnboarding(true);
+    function onDocClick(e: MouseEvent) {
+      const t = e.target as Node;
+      if (showVariants && variantsRef.current && !variantsRef.current.contains(t)) setShowVariants(false);
+      if (showDuration && durationRef.current && !durationRef.current.contains(t)) setShowDuration(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
   const handleGenerate = async () => {
@@ -169,30 +180,85 @@ export default function MusicianApp() {
                 placeholder="Describe your song..."
                 className="flex-1 rounded-2xl bg-black/40 border border-white/10 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20"
               />
-              <div className="flex items-center gap-2 text-sm text-white/80">
-                <div className="px-3 py-2 rounded-xl bg-black/40 border border-white/10">
-                  x
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={batch}
-                    onChange={(e) => setBatch(clamp(Number(e.target.value) || 1, 1, 10))}
-                    className="ml-1 w-12 bg-transparent focus:outline-none"
-                    aria-label="Variations"
-                  />
+              <div className="flex items-center gap-2 text-sm text-white/80 relative">
+                {/* Variants trigger */}
+                <div ref={variantsRef} className="relative">
+                  <button
+                    onClick={() => { setShowVariants((s) => !s); setShowDuration(false); }}
+                    className="px-3 py-2 rounded-xl bg-black/40 border border-white/10 flex items-center gap-2 hover:bg-white/10"
+                    aria-label="Number of variants"
+                  >
+                    <Layers className="size-4" /> {batch}
+                  </button>
+                  {showVariants && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: -6, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                      transition={{ duration: 0.18 }}
+                      className="absolute -top-2 left-0 translate-y-[-100%] rounded-2xl border border-white/10 bg-[#0b0b12] shadow-2xl p-4 w-64"
+                    >
+                      <div className="font-medium mb-3">Number of Variants</div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[1,2,3,4].map((n)=> (
+                          <button
+                            key={n}
+                            onClick={()=>{ setBatch(n); setShowVariants(false); }}
+                            className={`h-10 rounded-xl border ${batch===n?"bg-white/10 border-white":"bg-white/5 border-white/10 hover:bg-white/10"}`}
+                          >{n}</button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
-                <div className="px-3 py-2 rounded-xl bg-black/40 border border-white/10">
-                  <input
-                    type="number"
-                    min={5}
-                    max={120}
-                    value={duration}
-                    onChange={(e) => setDuration(clamp(Number(e.target.value) || 30, 5, 120))}
-                    className="w-16 bg-transparent focus:outline-none"
-                    aria-label="Duration seconds"
-                  />
-                  s
+
+                {/* Duration trigger */}
+                <div ref={durationRef} className="relative">
+                  <button
+                    onClick={() => { setShowDuration((s) => !s); setShowVariants(false); }}
+                    className="px-3 py-2 rounded-xl bg-black/40 border border-white/10 flex items-center gap-2 hover:bg-white/10"
+                    aria-label="Duration"
+                  >
+                    <ArrowLeftRight className="size-4" /> {Math.round(duration)}s
+                  </button>
+                  {showDuration && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: -6, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                      transition={{ duration: 0.18 }}
+                      className="absolute -top-2 left-0 translate-y-[-100%] rounded-2xl border border-white/10 bg-[#0b0b12] shadow-2xl p-4 w-[22rem]"
+                    >
+                      <div className="font-medium mb-3">Duration</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {[
+                          {label:"Auto", val:30},
+                          {label:"30s", val:30},
+                          {label:"1m", val:60},
+                          {label:"2m", val:120},
+                        ].map((o)=> (
+                          <button key={o.label} onClick={()=>{ setDuration(o.val); setShowDuration(false); }} className={`px-3 h-10 rounded-xl border ${duration===o.val?"bg-white/10 border-white":"bg-white/5 border-white/10 hover:bg-white/10"}`}>{o.label}</button>
+                        ))}
+                        {/* Coming soon items */}
+                        {[
+                          {label:"3m"},{label:"4m"}
+                        ].map((o)=> (
+                          <button key={o.label} disabled className="px-3 h-10 rounded-xl border bg-white/5 border-white/10 opacity-40 cursor-not-allowed">{o.label}</button>
+                        ))}
+                        <div className="ml-auto flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={5}
+                            max={120}
+                            value={duration}
+                            onChange={(e)=> setDuration(clamp(Number(e.target.value)||30,5,120))}
+                            className="w-20 bg-black/40 border border-white/10 rounded-xl px-2 py-1"
+                          />
+                          <span className="text-white/60 text-xs">Custom (s)</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               </div>
               <button
