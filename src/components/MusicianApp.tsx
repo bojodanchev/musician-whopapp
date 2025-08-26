@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Music, PlayCircle, Download, CreditCard } from "lucide-react";
+import OnboardingWizard from "@/components/OnboardingWizard";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -34,6 +35,7 @@ export default function MusicianApp() {
     [] as Array<{ id: string; title: string; bpm: number; key: string; duration: number; date: string; url: string }>
   );
   const generateBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     // pick up preset query string if present
@@ -46,6 +48,9 @@ export default function MusicianApp() {
         generateBtnRef.current?.focus();
       }, 50);
     }
+    // onboarding: show once per device
+    const seen = localStorage.getItem("musician_onboarded");
+    if (!seen) setShowOnboarding(true);
   }, []);
 
   const handleGenerate = async () => {
@@ -128,6 +133,15 @@ export default function MusicianApp() {
 
   return (
     <div className="min-h-screen bg-[#0b0b12] text-white">
+      {showOnboarding && (
+        <OnboardingWizard
+          onClose={() => { localStorage.setItem("musician_onboarded", "1"); setShowOnboarding(false); }}
+          onComplete={(presetPrompt) => {
+            setPrompt(presetPrompt);
+            setTimeout(() => generateBtnRef.current?.focus(), 50);
+          }}
+        />
+      )}
       <header className="sticky top-0 z-20 backdrop-blur supports-[backdrop-filter]:bg-black/30 border-b border-white/10">
         <div className="mx-auto max-w-5xl px-4 py-3 flex items-center gap-3">
           <div className="size-9 rounded-xl bg-gradient-to-br from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] grid place-items-center">
