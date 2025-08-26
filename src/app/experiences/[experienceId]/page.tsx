@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Music, Calendar, User, Sparkles, PlayCircle, Download, Shield } from "lucide-react";
+import PlanCard from "@/components/PlanCard";
 
 export const dynamic = "force-dynamic";
 
@@ -164,20 +165,9 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
           <p className="text-white/70 text-sm">Whop access maps to credits and features</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            {name:"Starter", price:"$9.99/mo", features:["150 credits","30s max","Loops" ]},
-            {name:"Pro", price:"$29.99/mo", features:["600 credits","Batch x4","Streaming preview"]},
-            {name:"Studio", price:"$49.99/mo", features:["2000 credits","Batch x10","Advanced plan editor"]},
-          ].map((p)=> (
-            <div key={p.name} className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <div className="font-semibold">{p.name}</div>
-              <div className="text-3xl mt-2">{p.price}</div>
-              <ul className="mt-4 space-y-1 text-sm text-white/70 list-disc list-inside">
-                {p.features.map((f)=> <li key={f}>{f}</li>)}
-              </ul>
-              <Link href={`/experiences/${experienceId}/generate`} className="mt-5 inline-block w-full text-center rounded-xl bg-white/10 border border-white/10 py-2 hover:bg-white/15">Choose {p.name}</Link>
-            </div>
-          ))}
+          <PlanCard plan="STARTER" title="Starter" price="$9.99/mo" features={["150 credits","30s max","Loops"]} generateHref={`/experiences/${experienceId}/generate`} />
+          <PlanCard plan="PRO" title="Pro" price="$29.99/mo" features={["600 credits","Batch x4","Streaming preview"]} generateHref={`/experiences/${experienceId}/generate`} />
+          <PlanCard plan="STUDIO" title="Studio" price="$49.99/mo" features={["2000 credits","Batch x10","Advanced plan editor"]} generateHref={`/experiences/${experienceId}/generate`} />
         </div>
       </section>
 
