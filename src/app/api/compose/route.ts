@@ -6,6 +6,7 @@ import { verifyWhopFromRequest, getOrCreateAndSyncUser } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
 import { normalizeLoudness, renderLoopVersion } from "@/lib/processing/audio";
 import { env } from "@/lib/env";
+import { whopSdk } from "@/lib/whop";
 
 const composeSchema = z.object({
   vibe: z.string().min(1),
@@ -27,6 +28,15 @@ export async function POST(req: NextRequest) {
     const prisma = getPrisma();
     const verified = await verifyWhopFromRequest(req);
     const user = await getOrCreateAndSyncUser(verified.userId, undefined);
+
+    // Enforce Whop access: user must have at least STARTER experience
+    const experienceId = process.env.WHOP_PLAN_STARTER_ID as string | undefined;
+    if (experienceId) {
+      const access = await whopSdk.access.checkIfUserHasAccessToExperience({ userId: verified.userId, experienceId });
+      if (!access.hasAccess) {
+        return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
+      }
+    }
 
     // credits: 1 per variation
     try {

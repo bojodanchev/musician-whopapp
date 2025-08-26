@@ -26,3 +26,19 @@ export const whopPublic = {
   companyId: process.env.NEXT_PUBLIC_WHOP_COMPANY_ID,
 };
 
+export const plans = {
+  STARTER: process.env.WHOP_PLAN_STARTER_ID,
+  PRO: process.env.WHOP_PLAN_PRO_ID,
+  STUDIO: process.env.WHOP_PLAN_STUDIO_ID,
+};
+
+export async function userHasPlan(userId: string, planId: string) {
+  const result = await whopSdk.access.checkIfUserHasAccessToExperience({ userId, experienceId: planId });
+  return result.hasAccess;
+}
+
+export function subscribeUrl(planId: string) {
+  // Direct subscribe URL for Whop Experience
+  return `https://whop.com/checkout/${planId}?app_id=${APP_ID}`;
+}
+
