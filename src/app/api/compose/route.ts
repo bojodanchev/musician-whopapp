@@ -58,11 +58,15 @@ export async function POST(req: NextRequest) {
         headers: {
           "Content-Type": "application/json",
           "xi-api-key": env.ELEVENLABS_API_KEY,
+          // Some environments expect a standard bearer header; include both to be safe
+          Authorization: `Bearer ${env.ELEVENLABS_API_KEY}`,
+          Accept: "audio/mpeg",
         },
         body: JSON.stringify({ prompt: parsed.vibe, music_length_ms: parsed.duration * 1000 }),
       });
       if (!composeRes.ok) {
-        throw new Error(`ELEVENLABS_${composeRes.status}`);
+        const errText = await composeRes.text().catch(() => "");
+        throw new Error(`ELEVENLABS_${composeRes.status}${errText ? ":" + errText : ""}`);
       }
       const arrayBuf = await composeRes.arrayBuffer();
       const audioBuf = Buffer.from(arrayBuf);
