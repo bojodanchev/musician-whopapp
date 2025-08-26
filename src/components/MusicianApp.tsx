@@ -330,17 +330,23 @@ export default function MusicianApp() {
                   )}
                 </div>
               </div>
-              {/* Pro/Studio toggles */}
+              {/* Pro/Studio toggles with upgrade-on-click behavior */}
               <div className="flex items-center gap-3 text-xs text-white/70">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" disabled={!currentCaps().allowVocals} /> Vocals
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" disabled={!currentCaps().allowAdvanced} /> Reuse last plan
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" disabled={!currentCaps().allowStreaming} /> Streaming preview
-                </label>
+                {currentCaps().allowVocals ? (
+                  <label className="flex items-center gap-2"><input type="checkbox" /> Vocals</label>
+                ) : (
+                  <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Vocals (Pro)</button>
+                )}
+                {currentCaps().allowAdvanced ? (
+                  <label className="flex items-center gap-2"><input type="checkbox" /> Reuse last plan</label>
+                ) : (
+                  <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Reuse last plan (Pro)</button>
+                )}
+                {currentCaps().allowStreaming ? (
+                  <label className="flex items-center gap-2"><input type="checkbox" /> Streaming preview</label>
+                ) : (
+                  <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Streaming preview (Pro)</button>
+                )}
               </div>
               <button
                 ref={generateBtnRef}
