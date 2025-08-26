@@ -7,6 +7,7 @@ type DiagnosticsPayload = {
   userId?: string;
   accessLevel?: string;
   credits?: number | null;
+  plan?: string;
   env?: { USE_MOCK_MUSIC?: boolean; S3_BUCKET?: boolean; S3_REGION?: boolean; S3_READY?: boolean };
 };
 
@@ -18,6 +19,7 @@ export default function Diagnostics() {
       <div>User: {data?.userId ?? "-"}</div>
       <div>Access: {data?.accessLevel ?? "-"}</div>
       <div>Credits: {data?.credits ?? "-"}</div>
+      <div>Plan: {data?.plan ?? "-"}</div>
       <div className="mt-2 opacity-80">S3: {data?.env?.S3_READY ? "Ready" : "Not ready"}</div>
       <div>Mock Music: {data?.env?.USE_MOCK_MUSIC ? "On" : "Off"}</div>
     </section>
