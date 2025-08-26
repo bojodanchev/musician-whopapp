@@ -8,6 +8,23 @@ function clamp(n: number, min: number, max: number) {
 }
 
 export default function MusicianApp() {
+  type AssetOut = {
+    id: string;
+    title: string;
+    bpm: number;
+    key: string | null;
+    duration: number;
+    wavUrl: string;
+    loopUrl: string;
+    stemsZipUrl?: string | null;
+    licenseUrl: string;
+  };
+
+  type JobPollResponse =
+    | { status: "queued" | "processing" }
+    | { error: string }
+    | { assets: AssetOut[] };
+
   const [prompt, setPrompt] = useState("Futuristic, High Energy");
   const [duration, setDuration] = useState(30);
   const [batch, setBatch] = useState(1);
@@ -45,11 +62,11 @@ export default function MusicianApp() {
       while (!done) {
         await new Promise((r) => setTimeout(r, 1500));
         const st = await fetch(`/api/compose/${jobId}`, { credentials: "include" });
-        const data = (await st.json()) as any;
-        if (data.status === "queued" || data.status === "processing") continue;
-        if (data.error) throw new Error(data.error);
-        if (data.assets) {
-          const added = (data.assets as Array<any>).map((a: any, idx: number) => ({
+        const data = (await st.json()) as JobPollResponse;
+        if ("status" in data && (data.status === "queued" || data.status === "processing")) continue;
+        if ("error" in data) throw new Error(data.error);
+        if ("assets" in data) {
+          const added = data.assets.map((a, idx) => ({
             id: `${jobId}_${idx}`,
             title: prompt,
             bpm: 120,
@@ -59,10 +76,8 @@ export default function MusicianApp() {
             url: a.loopUrl,
           }));
           setItems((cur) => [...added, ...cur]);
-          done = true;
-        } else {
-          done = true;
         }
+        done = true;
       }
     } catch (e) {
       console.error(e);
