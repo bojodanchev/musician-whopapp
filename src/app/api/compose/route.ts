@@ -7,6 +7,7 @@ import { getStorage } from "@/lib/storage/s3";
 import { normalizeLoudness, renderLoopVersion } from "@/lib/processing/audio";
 import { env } from "@/lib/env";
 import { whopSdk } from "@/lib/whop";
+import { Plan } from "@prisma/client";
 
 const composeSchema = z.object({
   vibe: z.string().min(1),
@@ -36,6 +37,22 @@ export async function POST(req: NextRequest) {
       if (!access.hasAccess) {
         return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
       }
+    }
+
+    // Enforce per-plan caps to match UI
+    const caps: Record<Plan, { maxDuration: number; maxBatch: number }> = {
+      STARTER: { maxDuration: 30, maxBatch: 2 },
+      PRO: { maxDuration: 60, maxBatch: 4 },
+      STUDIO: { maxDuration: 120, maxBatch: 10 },
+    };
+    const userCaps = caps[user.plan];
+    if (parsed.duration > userCaps.maxDuration) {
+      const requiredPlan = parsed.duration <= caps.PRO.maxDuration ? "PRO" : "STUDIO";
+      return NextResponse.json({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
+    }
+    if (parsed.batch > userCaps.maxBatch) {
+      const requiredPlan = parsed.batch <= caps.PRO.maxBatch ? "PRO" : "STUDIO";
+      return NextResponse.json({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
     }
 
     // credits: 1 per variation

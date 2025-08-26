@@ -35,6 +35,7 @@ export default function MusicianApp() {
   const [items, setItems] = useState(
     [] as Array<{ id: string; title: string; bpm: number; key: string; duration: number; date: string; url: string }>
   );
+  const [upgradeBanner, setUpgradeBanner] = useState<null | { requiredPlan: "PRO" | "STUDIO" }>(null);
   const generateBtnRef = useRef<HTMLButtonElement | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showVariants, setShowVariants] = useState(false);
@@ -115,7 +116,11 @@ export default function MusicianApp() {
         }),
       });
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
+        const err = await resp.json().catch(() => ({} as any));
+        if (resp.status === 403 && (err?.error === "FORBIDDEN_PAYWALL" || err?.error === "UPGRADE_REQUIRED")) {
+          setUpgradeBanner({ requiredPlan: (err.requiredPlan || "PRO") as "PRO" | "STUDIO" });
+          return;
+        }
         throw new Error(err.error || `Compose failed: ${resp.status}`);
       }
       const result = await resp.json();
@@ -206,6 +211,17 @@ export default function MusicianApp() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-16">
+        {upgradeBanner && (
+          <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm flex items-center justify-between">
+            <div>
+              Upgrade required to continue. This action needs {upgradeBanner.requiredPlan}.
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => upgradeTo(upgradeBanner.requiredPlan)} className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff]">Upgrade</button>
+              <button onClick={() => setUpgradeBanner(null)} className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10">Dismiss</button>
+            </div>
+          </div>
+        )}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
           <div className="text-center mb-8">
             <div className="text-3xl md:text-5xl font-semibold">Begin your musical journey.</div>
