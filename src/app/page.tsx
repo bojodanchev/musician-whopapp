@@ -1,14 +1,27 @@
 import Link from "next/link";
+import { Music } from "lucide-react";
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#0b0b12] text-white">
+      <header className="sticky top-0 z-20 backdrop-blur supports-[backdrop-filter]:bg-black/30 border-b border-white/10">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
+          <div className="size-9 rounded-xl bg-gradient-to-br from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] grid place-items-center shadow-[0_0_40px_-10px_rgba(123,92,255,0.6)]">
+            <Music className="size-5" />
+          </div>
+          <div className="font-semibold tracking-tight">Musician</div>
+          <div className="ml-auto flex items-center gap-3 text-sm">
+            <Link href="/generate" className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">Open Composer</Link>
+            <Link href="#pricing" className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">Pricing</Link>
+          </div>
+        </div>
+      </header>
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] blur-2xl opacity-25" />
       </div>
 
       <section className="mx-auto max-w-6xl px-4 py-24 text-center">
-        <div className="text-4xl md:text-6xl font-semibold tracking-tight">Create catchy hooks for anything.</div>
+        <div className="text-4xl md:text-6xl font-semibold tracking-tight">Create your own music</div>
         <p className="mt-4 text-white/70 max-w-2xl mx-auto">Musician generates ready‑to‑use music for your videos, ads, and social content—backed by Whop entitlements and simple licensing.</p>
         <div className="mt-8 flex items-center justify-center gap-3">
           <Link href="/generate" className="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] shadow-lg">Open Composer</Link>

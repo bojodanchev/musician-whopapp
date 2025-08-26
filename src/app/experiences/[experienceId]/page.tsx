@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Music } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,19 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] blur-2xl opacity-25" />
       </div>
+
+      <header className="sticky top-0 z-20 backdrop-blur supports-[backdrop-filter]:bg-black/30 border-b border-white/10">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
+          <div className="size-9 rounded-xl bg-gradient-to-br from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] grid place-items-center shadow-[0_0_40px_-10px_rgba(123,92,255,0.6)]">
+            <Music className="size-5" />
+          </div>
+          <div className="font-semibold tracking-tight">Musician</div>
+          <div className="ml-auto flex items-center gap-3 text-sm">
+            <Link href={`/experiences/${experienceId}/generate`} className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">Open Composer</Link>
+            <a href="#pricing" className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10">Pricing</a>
+          </div>
+        </div>
+      </header>
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-4 py-20 text-center">
