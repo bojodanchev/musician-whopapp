@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       await prisma.user.update({ where: { id: user.id }, data: { plan: Plan.STARTER } });
     }
     return NextResponse.json({ ok: true });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ ok: false });
   }
 }

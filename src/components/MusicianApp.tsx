@@ -176,7 +176,8 @@ export default function MusicianApp() {
       try {
         const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
         if (typeof d?.credits === "number") setCreditsLeft(d.credits);
-        if (d?.whopUser?.plan || d?.plan) setPlan((d?.whopUser?.plan ?? d?.plan) as any);
+        const p = (d?.whopUser?.plan ?? d?.plan) as string | undefined;
+        if (p === "STARTER" || p === "PRO" || p === "STUDIO") setPlan(p);
       } catch {}
     })();
   }, []);
