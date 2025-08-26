@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Music, PlayCircle, Download, CreditCard } from "lucide-react";
 
@@ -33,6 +33,20 @@ export default function MusicianApp() {
   const [items, setItems] = useState(
     [] as Array<{ id: string; title: string; bpm: number; key: string; duration: number; date: string; url: string }>
   );
+  const generateBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    // pick up preset query string if present
+    const url = new URL(window.location.href);
+    const preset = url.searchParams.get("preset");
+    if (preset) {
+      setPrompt(preset);
+      // focus the Generate button to nudge action
+      setTimeout(() => {
+        generateBtnRef.current?.focus();
+      }, 50);
+    }
+  }, []);
 
   const handleGenerate = async () => {
     try {
@@ -121,9 +135,7 @@ export default function MusicianApp() {
           </div>
           <div className="font-semibold tracking-tight">Musician</div>
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
-              <CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft ?? "-"}</span>
-            </div>
+            <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2"><CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft ?? "-"}</span></div>
           </div>
         </div>
       </header>
@@ -170,6 +182,7 @@ export default function MusicianApp() {
                 </div>
               </div>
               <button
+                ref={generateBtnRef}
                 onClick={handleGenerate}
                 disabled={isGenerating || (typeof creditsLeft === "number" && creditsLeft <= 0)}
                 className="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] shadow-lg disabled:opacity-60"
