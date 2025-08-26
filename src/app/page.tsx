@@ -29,6 +29,38 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Transformation */}
+      <section className="mx-auto max-w-6xl px-4 pb-16">
+        <h2 className="text-xl font-semibold mb-4 text-center">From idea to song in ~60 seconds</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-white/80">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="font-medium mb-1">Input</div>
+            <ul className="list-disc list-inside text-white/70">
+              <li>Mood & style</li>
+              <li>Occasion (birthday, wedding, ad, workout)</li>
+              <li>Personal details (names, brand, vibe)</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-3xl font-semibold">~60s</div>
+              <div className="text-white/60">generation & processing</div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="font-medium mb-1">Output</div>
+            <ul className="list-disc list-inside text-white/70">
+              <li>Professionally produced, unique track</li>
+              <li>Loop and WAV, ready for socials & ads</li>
+              <li>License file for safe posting</li>
+            </ul>
+          </div>
+        </div>
+        <div className="text-center mt-6">
+          <Link href="/generate" className="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] shadow-lg">Start now</Link>
+        </div>
+      </section>
+
       {/* Use Cases */}
       <section className="mx-auto max-w-6xl px-4 pb-16">
         <h2 className="text-xl font-semibold mb-4 text-center">Popular use cases</h2>
