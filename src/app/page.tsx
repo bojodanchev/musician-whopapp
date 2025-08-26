@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Music } from "lucide-react";
+import { Music, PartyPopper, Calendar, User, Sparkles, PlayCircle, Download, Shield } from "lucide-react";
 
 export default function Home() {
   return (
@@ -32,32 +32,63 @@ export default function Home() {
       {/* Transformation */}
       <section className="mx-auto max-w-6xl px-4 pb-16">
         <h2 className="text-xl font-semibold mb-4 text-center">From idea to song in ~60 seconds</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-white/80">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="font-medium mb-1">Input</div>
-            <ul className="list-disc list-inside text-white/70">
-              <li>Mood & style</li>
-              <li>Occasion (birthday, wedding, ad, workout)</li>
-              <li>Personal details (names, brand, vibe)</li>
-            </ul>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-3xl font-semibold">~60s</div>
-              <div className="text-white/60">generation & processing</div>
+        <div className="relative">
+          <div className="rounded-3xl p-[1px] bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff]">
+            <div className="rounded-3xl bg-white/5 backdrop-blur p-6 md:p-8">
+              <div className="grid grid-cols-12 gap-6 items-center">
+                {/* Left: Input */}
+                <div className="col-span-12 md:col-span-5">
+                  <div className="text-sm uppercase tracking-wider text-white/60 mb-3">Your input</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-white/10 to-white/0 border border-white/10 p-3 flex items-center gap-3">
+                      <div className="size-9 rounded-full bg-gradient-to-br from-[#7b5cff] to-[#35a1ff] grid place-items-center"><Music className="size-5"/></div>
+                      <div className="text-sm">Mood & style</div>
+                    </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-white/10 to-white/0 border border-white/10 p-3 flex items-center gap-3">
+                      <div className="size-9 rounded-full bg-gradient-to-br from-[#ff4d9d] to-[#7b5cff] grid place-items-center"><Calendar className="size-5"/></div>
+                      <div className="text-sm">Occasion</div>
+                    </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-white/10 to-white/0 border border-white/10 p-3 flex items-center gap-3">
+                      <div className="size-9 rounded-full bg-gradient-to-br from-[#35a1ff] to-[#7b5cff] grid place-items-center"><User className="size-5"/></div>
+                      <div className="text-sm">Personal details</div>
+                    </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-white/10 to-white/0 border border-white/10 p-3 flex items-center gap-3">
+                      <div className="size-9 rounded-full bg-gradient-to-br from-[#ff4d9d] to-[#35a1ff] grid place-items-center"><Sparkles className="size-5"/></div>
+                      <div className="text-sm">Extra vibe</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bridge */}
+                <div className="col-span-12 md:col-span-2 flex items-center justify-center">
+                  <div className="relative w-full h-12 md:h-24">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] opacity-40" />
+                    <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.6),transparent)] animate-pulse rounded-full" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="px-3 py-1 text-xs rounded-full bg-white/10 border border-white/10">~60 seconds</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Output */}
+                <div className="col-span-12 md:col-span-5">
+                  <div className="text-sm uppercase tracking-wider text-white/60 mb-3">Your track</div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5">
+                    <div className="p-4">
+                      {/* waveform placeholder */}
+                      <div className="h-20 mb-3 rounded-lg bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.12),transparent_60%)] border border-white/10" />
+                      <div className="flex items-center gap-2">
+                        <button className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"><PlayCircle className="size-4"/>Play</button>
+                        <button className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"><Download className="size-4"/>Download</button>
+                        <button className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"><Shield className="size-4"/>License</button>
+                      </div>
+                      <div className="text-xs text-white/60 mt-2">Custom WAV + loop + license — ready to use</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="font-medium mb-1">Output</div>
-            <ul className="list-disc list-inside text-white/70">
-              <li>Professionally produced, unique track</li>
-              <li>Loop and WAV, ready for socials & ads</li>
-              <li>License file for safe posting</li>
-            </ul>
-          </div>
-        </div>
-        <div className="text-center mt-6">
-          <Link href="/generate" className="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] shadow-lg">Start now</Link>
         </div>
       </section>
 
