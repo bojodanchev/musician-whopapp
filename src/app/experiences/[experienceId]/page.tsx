@@ -36,6 +36,30 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
         </div>
       </section>
 
+      {/* Use Cases */}
+      <section className="mx-auto max-w-6xl px-4 pb-16">
+        <h2 className="text-xl font-semibold mb-4 text-center">Popular use cases</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {[
+            {name:"Birthday song", prompt:"Upbeat pop birthday song with the name Alex, celebratory claps and synths, 10s"},
+            {name:"Wedding entrance", prompt:"Romantic cinematic entrance cue with strings and light percussion, 20s"},
+            {name:"Small business jingle", prompt:"Catchy brand jingle for a coffee shop, warm acoustic guitar and handclaps, 15s"},
+            {name:"Reels background", prompt:"Modern electronic background loop for Instagram Reels, chill yet punchy, 10s"},
+            {name:"Workout burst", prompt:"High‑energy trap beat for HIIT interval, heavy 808 and crisp hats, 10s"},
+            {name:"Copyright‑free vlog", prompt:"Laid‑back lofi hip‑hop loop for vlog, vinyl crackle and soft keys, 15s"},
+          ].map((u)=> (
+            <Link
+              key={u.name}
+              href={{ pathname: `/experiences/${experienceId}/generate`, query: { preset: u.prompt } }}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10"
+            >
+              <div className="font-medium">{u.name}</div>
+              <div className="text-xs text-white/60 line-clamp-2">{u.prompt}</div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       {/* Features */}
       <section className="mx-auto max-w-6xl px-4 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
