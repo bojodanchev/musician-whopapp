@@ -17,6 +17,9 @@ const composeSchema = z.object({
   seed: z.string().optional(),
   batch: z.number().int().min(1).max(10).default(1),
   stems: z.boolean().default(false),
+  vocals: z.boolean().optional(),
+  reusePlan: z.boolean().optional(),
+  streamingPreview: z.boolean().optional(),
 });
 
 type ErrorBody = { error: string };
@@ -80,6 +83,21 @@ export async function POST(req: NextRequest) {
     });
 
     for (let i = 0; i < parsed.batch; i++) {
+      // Optionally reuse a composition plan: create a guided plan from prompt & duration
+      let compositionPlan: any | undefined;
+      if (parsed.reusePlan) {
+        const planRes = await fetch("https://api.elevenlabs.io/v1/music/composition-plan/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "xi-api-key": env.ELEVENLABS_API_KEY, Accept: "application/json" },
+          body: JSON.stringify({ prompt: parsed.vibe + (parsed.vocals ? ", with vocals" : ""), music_length_ms: parsed.duration * 1000 }),
+        });
+        if (planRes.ok) compositionPlan = await planRes.json().catch(() => undefined);
+      }
+
+      const bodyPayload = compositionPlan
+        ? { composition_plan: compositionPlan }
+        : { prompt: parsed.vibe + (parsed.vocals ? ", with vocals" : ""), music_length_ms: parsed.duration * 1000 };
+
       const composeRes = await fetch("https://api.elevenlabs.io/v1/music/compose", {
         method: "POST",
         headers: {
@@ -87,7 +105,7 @@ export async function POST(req: NextRequest) {
           "xi-api-key": env.ELEVENLABS_API_KEY,
           Accept: "audio/mpeg",
         },
-        body: JSON.stringify({ prompt: parsed.vibe, music_length_ms: parsed.duration * 1000 }),
+        body: JSON.stringify(bodyPayload),
       });
       if (!composeRes.ok) {
         const errText = await composeRes.text().catch(() => "");

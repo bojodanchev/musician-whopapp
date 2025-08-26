@@ -27,7 +27,7 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-4 py-20 text-center">
-        <h1 className="text-4xl md:text-6xl font-semibold tracking-tight">Create catchy hooks for anything.</h1>
+        <h1 className="text-4xl md:text-6xl font-semibold tracking-tight">Create your own music</h1>
         <p className="mt-4 text-white/70 max-w-2xl mx-auto">
           Musician generates ready‑to‑use music for your videos, ads, and social content—backed by Whop entitlements and simple licensing.
         </p>

@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight } from "lucide-react";
 import { useIframeSdk } from "@whop/react";
 import OnboardingWizard from "@/components/OnboardingWizard";
@@ -36,6 +37,9 @@ export default function MusicianApp() {
     [] as Array<{ id: string; title: string; bpm: number; key: string; duration: number; date: string; url: string }>
   );
   const [upgradeBanner, setUpgradeBanner] = useState<null | { requiredPlan: "PRO" | "STUDIO" }>(null);
+  const [vocals, setVocals] = useState(false);
+  const [reusePlan, setReusePlan] = useState(false);
+  const [streamPreview, setStreamPreview] = useState(false);
   const generateBtnRef = useRef<HTMLButtonElement | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showVariants, setShowVariants] = useState(false);
@@ -113,6 +117,9 @@ export default function MusicianApp() {
           seed: undefined,
           batch: clamp(Number(batch) || 1, 1, 10),
           stems: false,
+          vocals,
+          reusePlan,
+          streamingPreview: streamPreview,
         }),
       });
       if (!resp.ok) {
@@ -204,6 +211,7 @@ export default function MusicianApp() {
             <Music className="size-5" />
           </div>
           <div className="font-semibold tracking-tight">Musician</div>
+          <Link href="/" className="ml-3 text-xs px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Home</Link>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2"><CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft ?? "-"}</span></div>
           </div>
@@ -333,17 +341,17 @@ export default function MusicianApp() {
               {/* Pro/Studio toggles with upgrade-on-click behavior */}
               <div className="flex items-center gap-3 text-xs text-white/70">
                 {currentCaps().allowVocals ? (
-                  <label className="flex items-center gap-2"><input type="checkbox" /> Vocals</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={vocals} onChange={(e)=>setVocals(e.target.checked)} /> Vocals</label>
                 ) : (
                   <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Vocals (Pro)</button>
                 )}
                 {currentCaps().allowAdvanced ? (
-                  <label className="flex items-center gap-2"><input type="checkbox" /> Reuse last plan</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={reusePlan} onChange={(e)=>setReusePlan(e.target.checked)} /> Reuse last plan</label>
                 ) : (
                   <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Reuse last plan (Pro)</button>
                 )}
                 {currentCaps().allowStreaming ? (
-                  <label className="flex items-center gap-2"><input type="checkbox" /> Streaming preview</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={streamPreview} onChange={(e)=>setStreamPreview(e.target.checked)} /> Streaming preview</label>
                 ) : (
                   <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Streaming preview (Pro)</button>
                 )}
