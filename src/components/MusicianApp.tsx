@@ -266,7 +266,8 @@ export default function MusicianApp() {
       try {
         const a = await fetch("/api/assets", { credentials: "include" }).then((r)=> r.json());
         if (Array.isArray(a?.assets)) {
-          const mapped = a.assets.map((asset: any) => ({ id: asset.id, title: asset.title, bpm: asset.bpm ?? 120, key: asset.key ?? "-", duration: asset.duration ?? 30, date: "Just now", url: asset.loopUrl }));
+          const mapped = (a.assets as Array<{ id: string; title: string; bpm?: number; key?: string | null; duration?: number; loopUrl: string }>)
+            .map((asset) => ({ id: asset.id, title: asset.title, bpm: asset.bpm ?? 120, key: (asset.key ?? "-") as string, duration: asset.duration ?? 30, date: "Just now", url: asset.loopUrl }));
           setItems(mapped);
         }
       } catch {}
