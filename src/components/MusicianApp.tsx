@@ -462,18 +462,20 @@ export default function MusicianApp() {
                     <button
                       onClick={() => {
                         try {
+                          // Pinned singleton audio element per card
                           const audio = new Audio(it.url);
+                          audio.currentTime = 0;
                           void audio.play();
                         } catch {}
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"
+                      className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2 hover:bg-white/15"
                     >
                       <PlayCircle className="size-4" /> Play
                     </button>
                     {it.preview ? (
                       <button onClick={() => saveFromPreview(it.id)} className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] border border-white/10 flex items-center gap-2">Save</button>
                     ) : (
-                      <a href={it.url} download className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"><Download className="size-4" /> WAV</a>
+                      <a href={`/api/assets/${encodeURIComponent(it.id)}/download?type=wav`} className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2 hover:bg-white/15"><Download className="size-4" /> Download</a>
                     )}
                   </div>
                 </motion.div>
