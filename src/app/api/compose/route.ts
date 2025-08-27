@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
     });
 
     for (let i = 0; i < parsed.batch; i++) {
+      const baseKey = `users/${user.id}/jobs/${job.id}/take_${i + 1}`;
       // Optionally reuse a composition plan: create a guided plan from prompt & duration
       let compositionPlan: unknown | undefined;
       if (parsed.reusePlan) {
@@ -92,6 +93,11 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({ prompt: parsed.vibe + (parsed.vocals ? ", with vocals" : ""), music_length_ms: parsed.duration * 1000 }),
         });
         if (planRes.ok) compositionPlan = await planRes.json().catch(() => undefined);
+      }
+
+      // Persist composition plan alongside the asset key for later reuse/edit
+      if (compositionPlan) {
+        await storage.putObject({ key: `${baseKey}_plan.json`, contentType: "application/json", body: Buffer.from(JSON.stringify(compositionPlan)) });
       }
 
       const bodyPayload = compositionPlan
@@ -117,7 +123,6 @@ export async function POST(req: NextRequest) {
       const norm = await normalizeLoudness(audioBuf);
       const looped = await renderLoopVersion(norm);
 
-      const baseKey = `users/${user.id}/jobs/${job.id}/take_${i + 1}`;
       await storage.putObject({ key: `${baseKey}.wav`, contentType: "audio/wav", body: norm });
       await storage.putObject({ key: `${baseKey}_loop.wav`, contentType: "audio/wav", body: looped });
 

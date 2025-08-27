@@ -34,7 +34,7 @@ export default function MusicianApp() {
   const [isGenerating, setGenerating] = useState(false);
   const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
   const [items, setItems] = useState(
-    [] as Array<{ id: string; title: string; bpm: number; key: string; duration: number; date: string; url: string }>
+    [] as Array<{ id: string; title: string; bpm: number; key: string; duration: number; date: string; url: string; preview?: boolean }>
   );
   const [upgradeBanner, setUpgradeBanner] = useState<null | { requiredPlan: "PRO" | "STUDIO" }>(null);
   const [vocals, setVocals] = useState(false);
@@ -102,9 +102,36 @@ export default function MusicianApp() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [showVariants, showDuration]);
 
+  const handlePreview = async () => {
+    try {
+      setGenerating(true);
+      const resp = await fetch("/api/compose/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, duration: clamp(Number(duration) || 30, 5, 120) }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`Stream failed: ${resp.status}`);
+      const arrayBuf = await resp.arrayBuffer();
+      const blob = new Blob([arrayBuf], { type: "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+      const id = `preview_${Date.now()}`;
+      const item = { id, title: prompt, bpm: 120, key: "-", duration, date: "Preview", url, preview: true };
+      setItems((cur) => [item, ...cur]);
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handleGenerate = async () => {
     try {
       setGenerating(true);
+      if (streamPreview) {
+        await handlePreview();
+        return;
+      }
       const resp = await fetch("/api/compose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,6 +204,50 @@ export default function MusicianApp() {
       } catch {}
     }
   };
+
+  async function saveFromPreview(previewId: string) {
+    try {
+      setGenerating(true);
+      const resp = await fetch("/api/compose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          vibe: prompt,
+          bpm: 120,
+          duration: clamp(Number(duration) || 30, 5, 120),
+          structure: "intro-drop-outro",
+          batch: 1,
+          stems: false,
+          vocals,
+          reusePlan,
+          streamingPreview: false,
+        }),
+      });
+      if (!resp.ok) {
+        const err = (await resp.json().catch(() => ({}))) as { error?: string; requiredPlan?: "PRO" | "STUDIO" };
+        if (resp.status === 403 && (err?.error === "FORBIDDEN_PAYWALL" || err?.error === "UPGRADE_REQUIRED")) {
+          setUpgradeBanner({ requiredPlan: (err.requiredPlan || "PRO") as "PRO" | "STUDIO" });
+          return;
+        }
+        throw new Error(err.error || `Compose failed: ${resp.status}`);
+      }
+      const result = await resp.json();
+      if (result?.assets && Array.isArray(result.assets) && result.assets.length > 0) {
+        const a = result.assets[0] as AssetOut;
+        setItems((cur) => cur.map((it) => (it.id === previewId ? { ...it, id: a.id ?? previewId, url: a.loopUrl, date: "Just now", preview: false } : it)));
+      }
+      try {
+        const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
+        if (typeof d?.credits === "number") setCreditsLeft(d.credits);
+      } catch {}
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -375,8 +446,22 @@ export default function MusicianApp() {
                   <div className="font-medium truncate mb-1">{it.title}</div>
                   <div className="text-xs text-white/60">{it.duration}s • Just now</div>
                   <div className="mt-4 flex items-center gap-2">
-                    <button className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"><PlayCircle className="size-4" /> Play</button>
-                    <button className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"><Download className="size-4" /> WAV</button>
+                    <button
+                      onClick={() => {
+                        try {
+                          const audio = new Audio(it.url);
+                          void audio.play();
+                        } catch {}
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"
+                    >
+                      <PlayCircle className="size-4" /> Play
+                    </button>
+                    {it.preview ? (
+                      <button onClick={() => saveFromPreview(it.id)} className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] border border-white/10 flex items-center gap-2">Save</button>
+                    ) : (
+                      <a href={it.url} download className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2"><Download className="size-4" /> WAV</a>
+                    )}
                   </div>
                 </motion.div>
               ))}
