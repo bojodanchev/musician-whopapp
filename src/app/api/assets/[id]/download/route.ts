@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return new Response(resp.body, {
       headers: {
         "Content-Type": resp.headers.get("Content-Type") || "audio/wav",
-        "Content-Disposition": `attachment; filename="${filename}"`;
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (e) {
