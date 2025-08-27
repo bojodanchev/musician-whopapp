@@ -1,14 +1,16 @@
+import { NextRequest } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { verifyWhopFromRequest } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await ctx.params;
     const { userId } = await verifyWhopFromRequest(req);
     if (!userId) return new Response("UNAUTHENTICATED", { status: 401 });
 
     const prisma = getPrisma();
-    const asset = await prisma.asset.findFirst({ where: { id: params.id, userId } });
+    const asset = await prisma.asset.findFirst({ where: { id, userId } });
     if (!asset) return new Response("NOT_FOUND", { status: 404 });
 
     const url = new URL(req.url);
