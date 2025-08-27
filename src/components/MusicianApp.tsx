@@ -308,14 +308,16 @@ export default function MusicianApp() {
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/5 p-3 md:p-4">
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-              <input
+            <div className="flex flex-col gap-3">
+              <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Describe your song..."
-                className="flex-1 rounded-2xl bg-black/40 border border-white/10 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20"
+                rows={2}
+                className="w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 md:py-4 focus:outline-none focus:ring-2 focus:ring-white/20 text-base min-h-[72px]"
               />
-              <div className="flex items-center gap-2 text-sm text-white/80 relative">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 text-sm text-white/80 relative">
                 {/* Variants trigger */}
                 <div ref={variantsRef} className="relative">
                   <button
@@ -408,9 +410,8 @@ export default function MusicianApp() {
                     </motion.div>
                   )}
                 </div>
-              </div>
-              {/* Pro/Studio toggles with upgrade-on-click behavior */}
-              <div className="flex items-center gap-3 text-xs text-white/70">
+                {/* Pro/Studio toggles with upgrade-on-click behavior */}
+                <div className="flex items-center gap-3 text-xs text-white/70">
                 {currentCaps().allowVocals ? (
                   <label className="flex items-center gap-2"><input type="checkbox" checked={vocals} onChange={(e)=>setVocals(e.target.checked)} /> Vocals</label>
                 ) : (
@@ -426,15 +427,16 @@ export default function MusicianApp() {
                 ) : (
                   <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Streaming preview (Pro)</button>
                 )}
+                </div>
+                <button
+                  ref={generateBtnRef}
+                  onClick={handleGenerate}
+                  disabled={isGenerating || (typeof creditsLeft === "number" && creditsLeft <= 0)}
+                  className="ml-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] shadow-lg disabled:opacity-60"
+                >
+                  {isGenerating ? "Generating…" : "Generate"}
+                </button>
               </div>
-              <button
-                ref={generateBtnRef}
-                onClick={handleGenerate}
-                disabled={isGenerating || (typeof creditsLeft === "number" && creditsLeft <= 0)}
-                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] shadow-lg disabled:opacity-60"
-              >
-                {isGenerating ? "Generating…" : "Generate"}
-              </button>
             </div>
           </div>
 
