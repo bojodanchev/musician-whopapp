@@ -262,6 +262,14 @@ export default function MusicianApp() {
         const p = (d?.whopUser?.plan ?? d?.plan) as string | undefined;
         if (p === "STARTER" || p === "PRO" || p === "STUDIO") setPlan(p);
       } catch {}
+      // load recent assets
+      try {
+        const a = await fetch("/api/assets", { credentials: "include" }).then((r)=> r.json());
+        if (Array.isArray(a?.assets)) {
+          const mapped = a.assets.map((asset: any) => ({ id: asset.id, title: asset.title, bpm: asset.bpm ?? 120, key: asset.key ?? "-", duration: asset.duration ?? 30, date: "Just now", url: asset.loopUrl }));
+          setItems(mapped);
+        }
+      } catch {}
     })();
   }, []);
 
