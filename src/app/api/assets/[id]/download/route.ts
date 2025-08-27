@@ -12,7 +12,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       const v = await verifyWhopFromRequest(req);
       userId = v.userId;
     } catch {}
-    if (!userId) userId = cookies().get("musician_uid")?.value ?? null;
+    if (!userId) {
+      const store = await cookies();
+      userId = store.get("musician_uid")?.value ?? null;
+    }
     if (!userId) return new Response("UNAUTHENTICATED", { status: 401 });
 
     const prisma = getPrisma();

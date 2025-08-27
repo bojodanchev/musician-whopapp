@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
       userId = v.userId;
     } catch {}
     if (!userId) {
-      // fallback to cookie set on compose
-      const uid = cookies().get("musician_uid")?.value;
+      const store = await cookies();
+      const uid = store.get("musician_uid")?.value;
       if (uid) userId = uid;
     }
     if (!userId) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
