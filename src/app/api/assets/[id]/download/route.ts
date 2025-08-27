@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, cookies } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { verifyWhopFromRequest } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
@@ -6,7 +6,12 @@ import { getStorage } from "@/lib/storage/s3";
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
-    const { userId } = await verifyWhopFromRequest(req);
+    let userId: string | null = null;
+    try {
+      const v = await verifyWhopFromRequest(req);
+      userId = v.userId;
+    } catch {}
+    if (!userId) userId = cookies().get("musician_uid")?.value ?? null;
     if (!userId) return new Response("UNAUTHENTICATED", { status: 401 });
 
     const prisma = getPrisma();

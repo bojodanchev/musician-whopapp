@@ -154,7 +154,12 @@ export async function POST(req: NextRequest) {
 
     await prisma.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
 
-    return NextResponse.json({ assets: assetsOut });
+    const res = NextResponse.json({ assets: assetsOut });
+    try {
+      // Persist user id for future asset listing/downloads when Whop headers are absent
+      res.cookies.set("musician_uid", user.id, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", secure: true });
+    } catch {}
+    return res;
   } catch (err) {
     const message = err instanceof Error ? err.message : "UNKNOWN_ERROR";
     return NextResponse.json<ErrorBody>({ error: message }, { status: 400 });
