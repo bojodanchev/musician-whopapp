@@ -53,3 +53,17 @@ export async function userHasAccessPass(userId: string, passId: string) {
   return res.hasAccess;
 }
 
+// Plan caps used in UI and server enforcement
+export const WHOP_PLAN_CAPS = {
+  STARTER: { maxDuration: 30, maxBatch: 2 },
+  PRO: { maxDuration: 60, maxBatch: 4 },
+  STUDIO: { maxDuration: 120, maxBatch: 10 },
+} as const;
+
+// Suggested monthly baseline credits aligned to Eleven costs (~650 credits per 30s gen)
+export const PLAN_BASELINE_CREDITS = {
+  STARTER: 50,
+  PRO: 200,
+  STUDIO: 600,
+} as const;
+

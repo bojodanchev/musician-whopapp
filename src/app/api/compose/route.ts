@@ -63,9 +63,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
     }
 
-    // credits: 1 per variation
+    // Credits cost: charge per 30s block per variation (maps ~50 gens for 150 credits)
+    const creditUnits = Math.max(1, Math.ceil(parsed.duration / 30)) * parsed.batch;
     try {
-      await decrementCreditsAtomically(user.id, parsed.batch);
+      await decrementCreditsAtomically(user.id, creditUnits);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       if (message === "INSUFFICIENT_CREDITS") {
