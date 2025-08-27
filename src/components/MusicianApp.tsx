@@ -28,7 +28,7 @@ export default function MusicianApp() {
     | { error: string }
     | { assets: AssetOut[] };
 
-  const [prompt, setPrompt] = useState("Futuristic, High Energy");
+  const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(30);
   const [batch, setBatch] = useState(1);
   const [isGenerating, setGenerating] = useState(false);

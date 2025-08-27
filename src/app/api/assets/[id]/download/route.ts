@@ -36,7 +36,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     if (!resp.ok || !resp.body) return new Response("UPSTREAM_ERROR", { status: 502 });
 
     const filenameBase = (asset.title || "musician").replace(/[^a-z0-9-_]+/gi, "_").slice(0, 64);
-    const filename = `${filenameBase}_${type}.wav`;
+    // Use file extension from key (mp3)
+    const ext = (key.endsWith(".mp3") ? "mp3" : key.endsWith(".wav") ? "wav" : "audio");
+    const filename = `${filenameBase}_${type}.${ext}`;
 
     return new Response(resp.body, {
       headers: {

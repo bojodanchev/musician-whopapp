@@ -128,12 +128,13 @@ export async function POST(req: NextRequest) {
       const norm = await normalizeLoudness(audioBuf);
       const looped = await renderLoopVersion(norm);
 
-      await storage.putObject({ key: `${baseKey}.wav`, contentType: "audio/wav", body: norm });
-      await storage.putObject({ key: `${baseKey}_loop.wav`, contentType: "audio/wav", body: looped });
+      // Store MP3 outputs to match Eleven Music default; loop version as mp3 too
+      await storage.putObject({ key: `${baseKey}.mp3`, contentType: "audio/mpeg", body: norm });
+      await storage.putObject({ key: `${baseKey}_loop.mp3`, contentType: "audio/mpeg", body: looped });
 
       // Generate signed URLs for immediate playback and download
-      const wavSigned = await storage.getSignedUrl({ key: `${baseKey}.wav`, method: "GET" });
-      const loopSigned = await storage.getSignedUrl({ key: `${baseKey}_loop.wav`, method: "GET" });
+      const wavSigned = await storage.getSignedUrl({ key: `${baseKey}.mp3`, method: "GET" });
+      const loopSigned = await storage.getSignedUrl({ key: `${baseKey}_loop.mp3`, method: "GET" });
 
       const asset = await prisma.asset.create({
         data: {
@@ -143,8 +144,8 @@ export async function POST(req: NextRequest) {
           bpm: parsed.bpm,
           key: null,
           duration: parsed.duration,
-          wavUrl: `${baseKey}.wav`,
-          loopUrl: `${baseKey}_loop.wav`,
+          wavUrl: `${baseKey}.mp3`,
+          loopUrl: `${baseKey}_loop.mp3`,
           stemsZipUrl: null,
           licenseUrl: `${baseKey}_license.txt`,
         },
