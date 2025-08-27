@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getPrisma } from "@/lib/prisma";
-import { verifyWhopFromRequest } from "@/lib/auth";
+import { verifyWhopFromRequest, getOrCreateAndSyncUser } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
 
 export async function GET(req: NextRequest) {
@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
     let userId: string | null = null;
     try {
       const v = await verifyWhopFromRequest(req);
-      userId = v.userId;
+      if (v?.userId) {
+        const u = await getOrCreateAndSyncUser(v.userId);
+        userId = u?.id ?? null;
+      }
     } catch {}
     if (!userId) {
       const store = await cookies();
