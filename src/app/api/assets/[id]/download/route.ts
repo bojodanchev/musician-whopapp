@@ -19,7 +19,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     if (!userId) return new Response("UNAUTHENTICATED", { status: 401 });
 
     const prisma = getPrisma();
-    const asset = await prisma.asset.findFirst({ where: { id, userId } });
+    let asset = await prisma.asset.findFirst({ where: { id, userId } });
+    if (!asset) {
+      // Fallback: allow download by id only if the record exists
+      asset = await prisma.asset.findUnique({ where: { id } });
+    }
     if (!asset) return new Response("NOT_FOUND", { status: 404 });
 
     const url = new URL(req.url);

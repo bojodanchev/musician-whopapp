@@ -21,11 +21,15 @@ export async function GET(req: NextRequest) {
     const assets = await prisma.asset.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 50 });
     const storage = getStorage();
     const out = await Promise.all(assets.map(async (a) => {
+      // Re-sign URLs each time to avoid expiry breaking history
       const wav = await storage.getSignedUrl({ key: a.wavUrl, method: "GET" });
       const loop = await storage.getSignedUrl({ key: a.loopUrl, method: "GET" });
       return { id: a.id, title: a.title, bpm: a.bpm, key: a.key, duration: a.duration, wavUrl: wav.url, loopUrl: loop.url, createdAt: a.createdAt };
     }));
-    return NextResponse.json({ assets: out });
+    const res = NextResponse.json({ assets: out });
+    // refresh cookie to prolong linkage
+    try { res.cookies.set("musician_uid", userId, { path: "/", maxAge: 60*60*24*365, sameSite: "lax", secure: true }); } catch {}
+    return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 400 });
