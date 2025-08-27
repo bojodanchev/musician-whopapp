@@ -1,9 +1,8 @@
-import { NextRequest } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { verifyWhopFromRequest } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
     const { userId } = await verifyWhopFromRequest(req);
     if (!userId) return new Response("UNAUTHENTICATED", { status: 401 });
