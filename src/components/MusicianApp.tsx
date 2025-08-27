@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight } from "lucide-react";
+import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight, Mic, RefreshCw } from "lucide-react";
 import { useIframeSdk } from "@whop/react";
 import OnboardingWizard from "@/components/OnboardingWizard";
 
@@ -63,6 +63,20 @@ export default function MusicianApp() {
   function currentCaps() {
     if (!plan) return planCaps.STARTER;
     return planCaps[plan];
+  }
+
+  function ToggleChip({ enabled, onClick, label, icon: Icon, tooltip }: { enabled: boolean; onClick: () => void; label: string; icon: React.ComponentType<{ className?: string }>; tooltip: string }) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`group relative px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs ${enabled ? "bg-white/10 border-white text-white" : "bg-black/40 border-white/10 text-white/70 hover:bg-white/10"}`}
+      >
+        <Icon className="size-4" />
+        <span>{label}</span>
+        <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-[calc(100%+6px)] whitespace-nowrap rounded-md bg-black/80 px-2 py-1 text-[10px] text-white/90 opacity-0 group-hover:opacity-100 transition">{tooltip}</span>
+      </button>
+    );
   }
 
   async function upgradeTo(target: "PRO" | "STUDIO") {
@@ -454,22 +468,22 @@ export default function MusicianApp() {
                 {/* Close inner controls row */}
                 </div>
                 {/* Pro/Studio toggles with upgrade-on-click behavior */}
-                <div className="flex items-center gap-3 text-xs text-white/70">
-                {currentCaps().allowVocals ? (
-                  <label className="flex items-center gap-2"><input type="checkbox" checked={vocals} onChange={(e)=>setVocals(e.target.checked)} /> Vocals</label>
-                ) : (
-                  <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Vocals (Pro)</button>
-                )}
-                {currentCaps().allowAdvanced ? (
-                  <label className="flex items-center gap-2"><input type="checkbox" checked={reusePlan} onChange={(e)=>setReusePlan(e.target.checked)} /> Reuse last plan</label>
-                ) : (
-                  <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Reuse last plan (Pro)</button>
-                )}
-                {currentCaps().allowStreaming ? (
-                  <label className="flex items-center gap-2"><input type="checkbox" checked={streamPreview} onChange={(e)=>setStreamPreview(e.target.checked)} /> Streaming preview</label>
-                ) : (
-                  <button onClick={() => upgradeTo("PRO")} className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Streaming preview (Pro)</button>
-                )}
+                <div className="flex items-center gap-2">
+                  {currentCaps().allowVocals ? (
+                    <ToggleChip enabled={vocals} onClick={()=>setVocals((v)=>!v)} label="Vocals" icon={Mic} tooltip="Ask the model to include vocals and melodies." />
+                  ) : (
+                    <ToggleChip enabled={false} onClick={()=>upgradeTo("PRO")} label="Vocals (Pro)" icon={Mic} tooltip="Upgrade to enable vocal generation." />
+                  )}
+                  {currentCaps().allowAdvanced ? (
+                    <ToggleChip enabled={reusePlan} onClick={()=>setReusePlan((v)=>!v)} label="Reuse last plan" icon={RefreshCw} tooltip="Create and reuse a composition plan for consistency across takes." />
+                  ) : (
+                    <ToggleChip enabled={false} onClick={()=>upgradeTo("PRO")} label="Reuse last plan (Pro)" icon={RefreshCw} tooltip="Upgrade to reuse composition plans for consistent tracks." />
+                  )}
+                  {currentCaps().allowStreaming ? (
+                    <ToggleChip enabled={streamPreview} onClick={()=>setStreamPreview((v)=>!v)} label="Streaming preview" icon={PlayCircle} tooltip="Audition a quick streamed preview before saving." />
+                  ) : (
+                    <ToggleChip enabled={false} onClick={()=>upgradeTo("PRO")} label="Streaming preview (Pro)" icon={PlayCircle} tooltip="Upgrade to stream previews instantly." />
+                  )}
                 </div>
                 <button
                   ref={generateBtnRef}
