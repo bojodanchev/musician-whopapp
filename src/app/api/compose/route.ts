@@ -33,12 +33,17 @@ export async function POST(req: NextRequest) {
     const verified = await verifyWhopFromRequest(req);
     const user = await getOrCreateAndSyncUser(verified.userId, undefined);
 
-    // Enforce Whop access: user must have at least STARTER experience
-    const experienceId = process.env.WHOP_PLAN_STARTER_ID as string | undefined;
-    if (experienceId) {
-      const access = await whopSdk.access.checkIfUserHasAccessToExperience({ userId: verified.userId, experienceId });
-      if (!access.hasAccess) {
-        return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
+    // Optional Whop access check: prefer Access Pass over Experience
+    // If not configured, skip instead of failing
+    const starterPassId = process.env.WHOP_PASS_STARTER_ID as string | undefined;
+    if (starterPassId) {
+      try {
+        const access = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId: verified.userId, accessPassId: starterPassId });
+        if (!access.hasAccess) {
+          return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
+        }
+      } catch {
+        // If the Access Pass is misconfigured or not found, do not block compose; plan caps and credits still enforce usage
       }
     }
 
