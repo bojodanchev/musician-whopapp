@@ -47,6 +47,10 @@ export default function MusicianApp() {
   const variantsRef = useRef<HTMLDivElement | null>(null);
   const durationRef = useRef<HTMLDivElement | null>(null);
   const [plan, setPlan] = useState<"STARTER" | "PRO" | "STUDIO" | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
   type IframeSdk = { inAppPurchase?: (opts: { planId: string }) => Promise<void> } | null;
   const iframeSdk = (useIframeSdk?.() as unknown as IframeSdk) || null;
 
@@ -117,6 +121,7 @@ export default function MusicianApp() {
       const id = `preview_${Date.now()}`;
       const item = { id, title: prompt, bpm: 120, key: "-", duration, date: "Preview", url, preview: true };
       setItems((cur) => [item, ...cur]);
+      // Do not autoplay; wait for explicit user action
     } catch (e) {
       console.error(e);
       alert(e instanceof Error ? e.message : String(e));
@@ -271,8 +276,35 @@ export default function MusicianApp() {
           setItems(mapped);
         }
       } catch {}
+      // Setup shared audio element for play/pause/progress
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+        const a = audioRef.current;
+        const onTime = () => {
+          if (!a.duration || isNaN(a.duration)) { setProgress(0); return; }
+          setProgress(a.currentTime / a.duration);
+        };
+        const onEnded = () => { setIsPlaying(false); setPlayingId(null); setProgress(0); };
+        a.addEventListener("timeupdate", onTime);
+        a.addEventListener("ended", onEnded);
+      }
     })();
   }, []);
+
+  function togglePlay(it: { id: string; url: string }) {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playingId === it.id) {
+      if (isPlaying) { a.pause(); setIsPlaying(false); } else { void a.play(); setIsPlaying(true); }
+      return;
+    }
+    a.src = it.url;
+    a.currentTime = 0;
+    setPlayingId(it.id);
+    setProgress(0);
+    void a.play();
+    setIsPlaying(true);
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0b12] text-white">
@@ -459,19 +491,12 @@ export default function MusicianApp() {
                   <div className="font-medium truncate mb-1">{it.title}</div>
                   <div className="text-xs text-white/60">{it.duration}s • Just now</div>
                   <div className="mt-4 flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        try {
-                          // Pinned singleton audio element per card
-                          const audio = new Audio(it.url);
-                          audio.currentTime = 0;
-                          void audio.play();
-                        } catch {}
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2 hover:bg-white/15"
-                    >
-                      <PlayCircle className="size-4" /> Play
+                    <button onClick={() => togglePlay(it)} className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2 hover:bg-white/15">
+                      <PlayCircle className="size-4" /> {playingId===it.id && isPlaying? "Pause" : "Play"}
                     </button>
+                    <div className="flex-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full bg-white/40" style={{ width: playingId===it.id ? `${Math.round(progress*100)}%` : "0%" }} />
+                    </div>
                     {it.preview ? (
                       <button onClick={() => saveFromPreview(it.id)} className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] border border-white/10 flex items-center gap-2">Save</button>
                     ) : (
