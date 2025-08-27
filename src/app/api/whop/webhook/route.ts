@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     if (accessPassId === passes.STUDIO) plan = Plan.STUDIO;
     if (!plan) return NextResponse.json({ ok: true });
 
-    const STARTER = 150; const PRO = 600; const STUDIO = 2000;
+    const STARTER = 50; const PRO = 200; const STUDIO = 700;
     const creditsByPlan: Record<Plan, number> = { STARTER, PRO, STUDIO } as const;
 
     // Upsert user by whopUserId and top-up credits to at least their plan baseline on renewal/purchase

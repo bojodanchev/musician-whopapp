@@ -323,7 +323,7 @@ export default function MusicianApp() {
             <Music className="size-5" />
           </div>
           <div className="font-semibold tracking-tight">Musician</div>
-          <Link href="/" className="ml-3 text-xs px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Home</Link>
+          <Link href={typeof window !== 'undefined' && window.top !== window.self ? "/experiences/" : "/"} className="ml-3 text-xs px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Home</Link>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2"><CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft ?? "-"}</span></div>
           </div>

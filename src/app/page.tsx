@@ -123,9 +123,9 @@ export default function Home() {
           <p className="text-white/70 text-sm">Whop access maps to credits and features</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <PlanCard plan="STARTER" title="Starter" price="$9.99/mo" features={["150 credits","30s max","Loops"]} generateHref="/generate" />
-          <PlanCard plan="PRO" title="Pro" price="$29.99/mo" features={["600 credits","Batch x4","Streaming preview"]} generateHref="/generate" />
-          <PlanCard plan="STUDIO" title="Studio" price="$49.99/mo" features={["2000 credits","Batch x10","Advanced plan editor"]} generateHref="/generate" />
+          <PlanCard plan="STARTER" title="Starter" price="$9.99/mo" features={["50 generations/mo","30s max","Loops"]} generateHref="/generate" />
+          <PlanCard plan="PRO" title="Pro" price="$29.99/mo" features={["200 generations/mo","Batch x4","Streaming preview"]} generateHref="/generate" />
+          <PlanCard plan="STUDIO" title="Studio" price="$49.99/mo" features={["700 generations/mo","Batch x10","Advanced plan editor"]} generateHref="/generate" />
         </div>
       </section>
 
