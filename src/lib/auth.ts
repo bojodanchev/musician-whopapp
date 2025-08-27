@@ -30,9 +30,9 @@ export async function getOrCreateUserByWhopId(whopUserId: string) {
 
 function mapPlanFromAccess(accessLevel?: string): { plan: Plan; startingCredits: number } {
   const level = (accessLevel ?? "").toLowerCase();
-  if (level.includes("studio")) return { plan: Plan.STUDIO, startingCredits: 2000 };
-  if (level.includes("pro")) return { plan: Plan.PRO, startingCredits: 600 };
-  return { plan: Plan.STARTER, startingCredits: 150 };
+  if (level.includes("studio")) return { plan: Plan.STUDIO, startingCredits: 700 };
+  if (level.includes("pro")) return { plan: Plan.PRO, startingCredits: 200 };
+  return { plan: Plan.STARTER, startingCredits: 50 };
 }
 
 export async function getOrCreateAndSyncUser(whopUserId: string, accessLevel?: string) {
