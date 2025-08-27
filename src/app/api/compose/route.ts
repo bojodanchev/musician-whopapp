@@ -131,6 +131,10 @@ export async function POST(req: NextRequest) {
       await storage.putObject({ key: `${baseKey}.wav`, contentType: "audio/wav", body: norm });
       await storage.putObject({ key: `${baseKey}_loop.wav`, contentType: "audio/wav", body: looped });
 
+      // Generate signed URLs for immediate playback and download
+      const wavSigned = await storage.getSignedUrl({ key: `${baseKey}.wav`, method: "GET" });
+      const loopSigned = await storage.getSignedUrl({ key: `${baseKey}_loop.wav`, method: "GET" });
+
       const asset = await prisma.asset.create({
         data: {
           userId: user.id,
@@ -145,7 +149,7 @@ export async function POST(req: NextRequest) {
           licenseUrl: `${baseKey}_license.txt`,
         },
       });
-      assetsOut.push({ id: asset.id, title: asset.title, bpm: asset.bpm, key: asset.key, duration: asset.duration, wavUrl: asset.wavUrl, loopUrl: asset.loopUrl, stemsZipUrl: asset.stemsZipUrl, licenseUrl: asset.licenseUrl });
+      assetsOut.push({ id: asset.id, title: asset.title, bpm: asset.bpm, key: asset.key, duration: asset.duration, wavUrl: wavSigned.url, loopUrl: loopSigned.url, stemsZipUrl: asset.stemsZipUrl, licenseUrl: asset.licenseUrl });
     }
 
     await prisma.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
