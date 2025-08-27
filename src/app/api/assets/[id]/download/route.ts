@@ -1,4 +1,5 @@
-import { NextRequest, cookies } from "next/server";
+import { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import { getPrisma } from "@/lib/prisma";
 import { verifyWhopFromRequest } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
