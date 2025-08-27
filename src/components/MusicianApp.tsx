@@ -410,6 +410,8 @@ export default function MusicianApp() {
                     </motion.div>
                   )}
                 </div>
+                {/* Close inner controls row */}
+                </div>
                 {/* Pro/Studio toggles with upgrade-on-click behavior */}
                 <div className="flex items-center gap-3 text-xs text-white/70">
                 {currentCaps().allowVocals ? (
