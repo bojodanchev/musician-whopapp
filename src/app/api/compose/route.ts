@@ -33,18 +33,25 @@ export async function POST(req: NextRequest) {
     const verified = await verifyWhopFromRequest(req);
     const user = await getOrCreateAndSyncUser(verified.userId, undefined);
 
+    // One-time free generation for new users (no paywall, no credits charged)
+    const freeTrialEvent = await prisma.event.findFirst({ where: { userId: user.id, type: "FREE_TRIAL_USED" } });
+    const trialEligible = !freeTrialEvent;
+
     // Optional Whop access check: prefer Access Pass over Experience
     // If not configured, skip instead of failing
     const starterPassId = process.env.WHOP_PASS_STARTER_ID as string | undefined;
+    let hasAccess = true;
     if (starterPassId) {
       try {
         const access = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId: verified.userId, accessPassId: starterPassId });
-        if (!access.hasAccess) {
-          return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
-        }
+        hasAccess = !!access.hasAccess;
       } catch {
         // If the Access Pass is misconfigured or not found, do not block compose; plan caps and credits still enforce usage
+        hasAccess = true;
       }
+    }
+    if (!hasAccess && !trialEligible) {
+      return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
     }
 
     // Enforce per-plan caps to match UI
@@ -63,16 +70,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
     }
 
-    // Credits cost: charge per 30s block per variation (maps ~50 gens for 150 credits)
+    // Credits cost: charge per 30s block per variation, unless trialEligible without access
     const creditUnits = Math.max(1, Math.ceil(parsed.duration / 30)) * parsed.batch;
-    try {
-      await decrementCreditsAtomically(user.id, creditUnits);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      if (message === "INSUFFICIENT_CREDITS") {
-        return NextResponse.json<ErrorBody>({ error: "INSUFFICIENT_CREDITS" }, { status: 402 });
+    if (hasAccess || !trialEligible) {
+      try {
+        await decrementCreditsAtomically(user.id, creditUnits);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (message === "INSUFFICIENT_CREDITS") {
+          return NextResponse.json<ErrorBody>({ error: "INSUFFICIENT_CREDITS" }, { status: 402 });
+        }
+        throw e;
       }
-      throw e;
     }
 
     // Direct compose against ElevenLabs and return assets immediately
@@ -156,11 +165,17 @@ export async function POST(req: NextRequest) {
 
     await prisma.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
 
-    const res = NextResponse.json({ assets: assetsOut });
+    const res = NextResponse.json({ assets: assetsOut, trialUsed: !hasAccess && trialEligible });
     try {
       // Persist user id for future asset listing/downloads when Whop headers are absent
       res.cookies.set("musician_uid", user.id, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", secure: true });
     } catch {}
+    // Mark free trial consumed if applicable
+    if (!hasAccess && trialEligible) {
+      try {
+        await prisma.event.create({ data: { userId: user.id, type: "FREE_TRIAL_USED", payloadJson: { at: new Date().toISOString() } } });
+      } catch {}
+    }
     return res;
   } catch (err) {
     const message = err instanceof Error ? err.message : "UNKNOWN_ERROR";
