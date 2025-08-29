@@ -99,15 +99,31 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < parsed.batch; i++) {
       const baseKey = `users/${user.id}/jobs/${job.id}/take_${i + 1}`;
+      const promptText = parsed.vibe + (parsed.vocals ? ", with vocals" : "");
       // Optionally reuse a composition plan: create a guided plan from prompt & duration
       let compositionPlan: unknown | undefined;
       if (parsed.reusePlan) {
         const planRes = await fetch("https://api.elevenlabs.io/v1/music/composition-plan/create", {
           method: "POST",
           headers: { "Content-Type": "application/json", "xi-api-key": env.ELEVENLABS_API_KEY, Accept: "application/json" },
-          body: JSON.stringify({ prompt: parsed.vibe + (parsed.vocals ? ", with vocals" : ""), music_length_ms: parsed.duration * 1000 }),
+          body: JSON.stringify({ prompt: promptText, music_length_ms: parsed.duration * 1000 }),
         });
-        if (planRes.ok) compositionPlan = await planRes.json().catch(() => undefined);
+        if (planRes.ok) {
+          compositionPlan = await planRes.json().catch(() => undefined);
+        } else if (planRes.status === 400) {
+          const errText = await planRes.text().catch(() => "");
+          try {
+            const detail = JSON.parse(errText) as { detail?: { message?: string; data?: { prompt_suggestion?: string } } };
+            const suggestion = detail?.detail?.data?.prompt_suggestion;
+            if (suggestion) {
+              return NextResponse.json({ error: "BAD_PROMPT", message: detail?.detail?.message ?? "Prompt violates policy", suggestedPrompt: suggestion }, { status: 422 });
+            }
+          } catch {}
+          throw new Error(`ELEVENLABS_${planRes.status}${errText ? ":" + errText : ""}`);
+        } else {
+          const errText = await planRes.text().catch(() => "");
+          throw new Error(`ELEVENLABS_${planRes.status}${errText ? ":" + errText : ""}`);
+        }
       }
 
       // Persist composition plan alongside the asset key for later reuse/edit
@@ -117,7 +133,7 @@ export async function POST(req: NextRequest) {
 
       const bodyPayload = compositionPlan
         ? { composition_plan: compositionPlan }
-        : { prompt: parsed.vibe + (parsed.vocals ? ", with vocals" : ""), music_length_ms: parsed.duration * 1000 };
+        : { prompt: promptText, music_length_ms: parsed.duration * 1000 };
 
       const composeRes = await fetch("https://api.elevenlabs.io/v1/music/compose", {
         method: "POST",
@@ -130,6 +146,15 @@ export async function POST(req: NextRequest) {
       });
       if (!composeRes.ok) {
         const errText = await composeRes.text().catch(() => "");
+        if (composeRes.status === 400) {
+          try {
+            const detail = JSON.parse(errText) as { detail?: { message?: string; data?: { prompt_suggestion?: string } } };
+            const suggestion = detail?.detail?.data?.prompt_suggestion;
+            if (suggestion) {
+              return NextResponse.json({ error: "BAD_PROMPT", message: detail?.detail?.message ?? "Prompt violates policy", suggestedPrompt: suggestion }, { status: 422 });
+            }
+          } catch {}
+        }
         throw new Error(`ELEVENLABS_${composeRes.status}${errText ? ":" + errText : ""}`);
       }
       const arrayBuf = await composeRes.arrayBuffer();
