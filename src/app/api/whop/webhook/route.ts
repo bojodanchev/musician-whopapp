@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
-import { passes } from "@/lib/whop";
+import { passes, plans } from "@/lib/whop";
 import { Plan } from "@prisma/client";
 import crypto from "crypto";
 
@@ -25,15 +25,16 @@ export async function POST(req: NextRequest) {
     const eventType: string | undefined = body?.type || body?.event;
     // Minimal validation; ideally verify signature if provided by Whop
     const userId: string | undefined = body?.userId || body?.user?.id || body?.data?.userId || body?.data?.user?.id;
-    const accessPassId: string | undefined = body?.accessPassId || body?.experienceId || body?.data?.accessPassId;
+    const accessPassId: string | undefined = body?.accessPassId || body?.data?.accessPassId;
+    const experienceId: string | undefined = body?.experienceId || body?.data?.experienceId;
     if (!userId || !accessPassId) return NextResponse.json({ ok: false });
 
     const prisma = getPrisma();
-    // Map access pass to plan
+    // Map Access Pass or Experience to plan
     let plan: Plan | null = null;
-    if (accessPassId === passes.STARTER) plan = Plan.STARTER;
-    if (accessPassId === passes.PRO) plan = Plan.PRO;
-    if (accessPassId === passes.STUDIO) plan = Plan.STUDIO;
+    if (accessPassId === passes.STARTER || experienceId === plans.STARTER) plan = Plan.STARTER;
+    if (accessPassId === passes.PRO || experienceId === plans.PRO) plan = Plan.PRO;
+    if (accessPassId === passes.STUDIO || experienceId === plans.STUDIO) plan = Plan.STUDIO;
     if (!plan) return NextResponse.json({ ok: true });
 
     const STARTER = 50; const PRO = 200; const STUDIO = 700;

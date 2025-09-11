@@ -37,18 +37,43 @@ export async function POST(req: NextRequest) {
     const freeTrialEvent = await prisma.event.findFirst({ where: { userId: user.id, type: "FREE_TRIAL_USED" } });
     const trialEligible = !freeTrialEvent;
 
-    // Optional Whop access check: prefer Access Pass over Experience
-    // If not configured, skip instead of failing
-    const starterPassId = process.env.WHOP_PASS_STARTER_ID as string | undefined;
+    // Whop entitlement check: consider Experience (plan) or Access Pass; auto-sync user plan if higher
     let hasAccess = true;
-    if (starterPassId) {
-      try {
-        const access = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId: verified.userId, accessPassId: starterPassId });
-        hasAccess = !!access.hasAccess;
-      } catch {
-        // If the Access Pass is misconfigured or not found, do not block compose; plan caps and credits still enforce usage
-        hasAccess = true;
+    try {
+      const planIds = [process.env.WHOP_PLAN_PRO_ID, process.env.WHOP_PLAN_STUDIO_ID].filter(Boolean) as string[];
+      const passIds = [process.env.WHOP_PASS_STARTER_ID, process.env.WHOP_PASS_PRO_ID, process.env.WHOP_PASS_STUDIO_ID].filter(Boolean) as string[];
+      let detectedPlan: Plan | null = null;
+      for (const expId of planIds) {
+        const r = await whopSdk.access.checkIfUserHasAccessToExperience({ userId: verified.userId, experienceId: expId });
+        if (r.hasAccess) {
+          detectedPlan = expId === process.env.WHOP_PLAN_STUDIO_ID ? Plan.STUDIO : Plan.PRO;
+          break;
+        }
       }
+      if (!detectedPlan) {
+        for (const pid of passIds) {
+          const r = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId: verified.userId, accessPassId: pid });
+          if (r.hasAccess) {
+            if (pid === process.env.WHOP_PASS_STUDIO_ID) detectedPlan = Plan.STUDIO;
+            else if (pid === process.env.WHOP_PASS_PRO_ID) detectedPlan = Plan.PRO;
+            else detectedPlan = Plan.STARTER;
+            break;
+          }
+        }
+      }
+      // If we detected an entitlement higher than current user.plan, sync
+      if (detectedPlan && detectedPlan !== user.plan) {
+        const prisma = getPrisma();
+        const baseline = detectedPlan === Plan.STUDIO ? 700 : detectedPlan === Plan.PRO ? 200 : 50;
+        const newCredits = Math.max(user.credits, baseline);
+        await prisma.user.update({ where: { id: user.id }, data: { plan: detectedPlan, credits: newCredits } });
+        user.plan = detectedPlan;
+        user.credits = newCredits;
+      }
+      // Access is true if any entitlement exists; otherwise rely on trial
+      hasAccess = Boolean(detectedPlan);
+    } catch {
+      hasAccess = true; // fail-open to avoid blocking legitimate users if SDK errors
     }
     if (!hasAccess && !trialEligible) {
       return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
