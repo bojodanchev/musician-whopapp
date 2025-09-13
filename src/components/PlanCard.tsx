@@ -19,10 +19,11 @@ export default function PlanCard({ plan, title, price, features, generateHref }:
       try {
         const res = await fetch(`/api/whop/paywall?plan=${plan}`, { credentials: "include" });
         if (!res.ok) throw new Error("paywall");
-        const data: { hasAccess?: boolean } = await res.json();
+        const data: { hasAccess?: boolean; experienceAccess?: boolean } = await res.json();
         if (!cancelled) {
-          setHasAccess(Boolean(data?.hasAccess));
-          setHref(Boolean(data?.hasAccess) ? generateHref : `/api/whop/subscribe?plan=${plan}`);
+          const subHasAccess = Boolean(data?.experienceAccess);
+          setHasAccess(subHasAccess);
+          setHref(subHasAccess ? generateHref : `/api/whop/subscribe?plan=${plan}`);
         }
       } catch {
         if (!cancelled) setHref(`/api/whop/subscribe?plan=${plan}`);

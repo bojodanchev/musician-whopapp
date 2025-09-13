@@ -20,24 +20,26 @@ export async function GET(req: NextRequest) {
   }
   if (!userId) return NextResponse.json({ hasAccess: false });
 
-  // Check both Experience and Access Pass for robustness
-  let hasAccess = false;
+  // Check Experience (paid subscription) and Access Pass (feature gating)
+  let expAccess = false;
+  let passAccess = false;
   let accessLevel: string | undefined = undefined;
   try {
     if (planId) {
       const r = await whopSdk.access.checkIfUserHasAccessToExperience({ userId, experienceId: planId });
-      hasAccess = hasAccess || r.hasAccess;
+      expAccess = r.hasAccess;
       accessLevel = accessLevel ?? r.accessLevel;
     }
   } catch {}
   try {
     if (passId) {
       const r = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId, accessPassId: passId });
-      hasAccess = hasAccess || r.hasAccess;
+      passAccess = r.hasAccess;
     }
   } catch {}
 
-  return NextResponse.json({ hasAccess, accessLevel });
+  // For pricing, treat subscription access as Experience access only
+  return NextResponse.json({ hasAccess: expAccess, experienceAccess: expAccess, passAccess, accessLevel });
 }
 
 
