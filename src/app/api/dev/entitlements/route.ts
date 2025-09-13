@@ -22,8 +22,11 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ ok: false, error: "MISSING_USER" }, { status: 400 });
 
   // Check experiences and passes for the given user
-  const res: any = { experiences: {}, passes: {} };
-  const names: Array<"STARTER" | "PRO" | "STUDIO"> = ["STARTER", "PRO", "STUDIO"];
+  type PlanName = "STARTER" | "PRO" | "STUDIO";
+  type Flags = Record<PlanName, boolean>;
+  const emptyFlags: Flags = { STARTER: false, PRO: false, STUDIO: false };
+  const res: { experiences: Flags; passes: Flags } = { experiences: { ...emptyFlags }, passes: { ...emptyFlags } };
+  const names: Array<PlanName> = ["STARTER", "PRO", "STUDIO"];
   for (const name of names) {
     const expId = (plans as Record<string, string | undefined>)[name];
     const passId = (passes as Record<string, string | undefined>)[name];
