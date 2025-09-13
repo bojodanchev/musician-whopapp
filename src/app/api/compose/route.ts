@@ -6,7 +6,7 @@ import { verifyWhopFromRequest, getOrCreateAndSyncUser } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
 import { normalizeLoudness, renderLoopVersion } from "@/lib/processing/audio";
 import { env } from "@/lib/env";
-import { whopSdk } from "@/lib/whop";
+import { whopSdk, plans as whopPlans, passes as whopPasses } from "@/lib/whop";
 import { Plan } from "@prisma/client";
 
 const composeSchema = z.object({
@@ -40,25 +40,28 @@ export async function POST(req: NextRequest) {
     // Whop entitlement check: consider Experience (plan) or Access Pass; auto-sync user plan if higher
     let hasAccess = true;
     try {
-      const planIds = [process.env.WHOP_PLAN_PRO_ID, process.env.WHOP_PLAN_STUDIO_ID].filter(Boolean) as string[];
-      const passIds = [process.env.WHOP_PASS_STARTER_ID, process.env.WHOP_PASS_PRO_ID, process.env.WHOP_PASS_STUDIO_ID].filter(Boolean) as string[];
+      // Check experiences (STARTER, PRO, STUDIO) and access passes; pick highest access
+      const expMap: Array<{ id?: string; plan: Plan }> = [
+        { id: whopPlans.STUDIO, plan: Plan.STUDIO },
+        { id: whopPlans.PRO, plan: Plan.PRO },
+        { id: whopPlans.STARTER, plan: Plan.STARTER },
+      ];
+      const passMap: Array<{ id?: string; plan: Plan }> = [
+        { id: whopPasses.STUDIO, plan: Plan.STUDIO },
+        { id: whopPasses.PRO, plan: Plan.PRO },
+        { id: whopPasses.STARTER, plan: Plan.STARTER },
+      ];
       let detectedPlan: Plan | null = null;
-      for (const expId of planIds) {
-        const r = await whopSdk.access.checkIfUserHasAccessToExperience({ userId: verified.userId, experienceId: expId });
-        if (r.hasAccess) {
-          detectedPlan = expId === process.env.WHOP_PLAN_STUDIO_ID ? Plan.STUDIO : Plan.PRO;
-          break;
-        }
+      for (const { id, plan } of expMap) {
+        if (!id) continue;
+        const r = await whopSdk.access.checkIfUserHasAccessToExperience({ userId: verified.userId, experienceId: id });
+        if (r.hasAccess) { detectedPlan = plan; break; }
       }
       if (!detectedPlan) {
-        for (const pid of passIds) {
-          const r = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId: verified.userId, accessPassId: pid });
-          if (r.hasAccess) {
-            if (pid === process.env.WHOP_PASS_STUDIO_ID) detectedPlan = Plan.STUDIO;
-            else if (pid === process.env.WHOP_PASS_PRO_ID) detectedPlan = Plan.PRO;
-            else detectedPlan = Plan.STARTER;
-            break;
-          }
+        for (const { id, plan } of passMap) {
+          if (!id) continue;
+          const r = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId: verified.userId, accessPassId: id });
+          if (r.hasAccess) { detectedPlan = plan; break; }
         }
       }
       // If we detected an entitlement higher than current user.plan, sync
