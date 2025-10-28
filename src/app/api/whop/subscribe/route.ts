@@ -3,10 +3,11 @@ import { subscribeUrl, plans } from "@/lib/whop";
 
 export async function GET(req: NextRequest) {
   const plan = req.nextUrl.searchParams.get("plan");
+  const affiliateCode = req.nextUrl.searchParams.get("affiliate_code") ?? undefined;
   if (!plan) return NextResponse.json({ error: "MISSING_PLAN" }, { status: 400 });
   const planId = (plans as Record<string, string | undefined>)[plan.toUpperCase()];
   if (!planId) return NextResponse.json({ error: "UNKNOWN_PLAN" }, { status: 400 });
-  const url = subscribeUrl(planId);
+  const url = subscribeUrl(planId, affiliateCode);
   return NextResponse.redirect(url);
 }
 

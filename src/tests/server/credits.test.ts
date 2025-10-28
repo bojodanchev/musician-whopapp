@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { decrementCreditsAtomically } from "@/lib/credits";
 
 describe("credits", () => {
+  const prisma = getPrisma();
+
   beforeAll(async () => {
     // Ensure a user exists
     const existing = await prisma.user.findFirst();

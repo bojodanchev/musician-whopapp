@@ -163,6 +163,7 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
         <div className="text-center mb-8">
           <h2 className="text-2xl font-semibold">Plans</h2>
           <p className="text-white/70 text-sm">Whop access maps to credits and features</p>
+          <p className="text-white/60 text-xs mt-2">Flexible payment options: Monthly billing or 100+ payment methods including Klarna, Afterpay, and installment plans</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <PlanCard plan="STARTER" title="Starter" price="$9.99/mo" features={["50 generations/mo","30s max","Loops"]} generateHref={`/experiences/${experienceId}/generate`} />

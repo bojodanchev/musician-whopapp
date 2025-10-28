@@ -14,7 +14,21 @@ export default async function LibraryPage() {
     const verified = await whopSdk.verifyUserToken(hdrs);
     whopUserId = verified.userId;
   } catch {}
-  const where = whopUserId ? { user: { whopUserId } } : undefined;
+
+  // Require authentication - redirect if no whopUserId
+  if (!whopUserId) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <h1 className="text-xl font-semibold mb-4">Authentication Required</h1>
+          <p className="text-white/60 mb-6">You must be logged in to view your library.</p>
+          <Link href="/" className="px-4 py-2 rounded-xl bg-white/10 border border-white/10">Back to Generator</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const where = { user: { whopUserId } };
   const assets = await prisma.asset.findMany({ where, orderBy: { createdAt: "desc" }, take: 50 });
   let rows = assets.map((a) => ({
     ...a,

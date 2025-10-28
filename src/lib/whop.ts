@@ -43,9 +43,14 @@ export async function userHasPlan(userId: string, planId: string) {
   return result.hasAccess;
 }
 
-export function subscribeUrl(planId: string) {
-  // Direct subscribe URL for Whop Experience
-  return `https://whop.com/checkout/${planId}?app_id=${APP_ID}`;
+export function subscribeUrl(planId: string, affiliateCode?: string) {
+  // Direct subscribe URL for Whop Experience with optional affiliate code
+  const url = new URL(`https://whop.com/checkout/${planId}`);
+  url.searchParams.set("app_id", APP_ID ?? "");
+  if (affiliateCode) {
+    url.searchParams.set("affiliate_code", affiliateCode);
+  }
+  return url.toString();
 }
 
 export async function userHasAccessPass(userId: string, passId: string) {

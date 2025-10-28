@@ -28,20 +28,33 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: str
   const assetsOut: Array<{ id: string; title: string; bpm: number; key: string | null; duration: number; wavUrl: string; loopUrl: string; stemsZipUrl?: string | null; licenseUrl: string }> = [];
   for (let i = 0; i < (st.assets?.length ?? 0); i++) {
     const a = st.assets![i];
-    // For MVP mock, we just create placeholders; in real impl, download buffers
-    const wavBuffer = Buffer.from(`WAV_PLACEHOLDER_${jobId}_${i}`);
+
+    // Download actual audio from ElevenLabs
+    const wavResp = await fetch(a.wavUrl);
+    if (!wavResp.ok || !wavResp.body) {
+      await prisma.job.update({ where: { id: jobId }, data: { status: "FAILED", error: `Failed to download asset ${i}: ${wavResp.status}` } });
+      return NextResponse.json({ error: "ASSET_DOWNLOAD_FAILED" }, { status: 500 });
+    }
+    const wavBuffer = Buffer.from(await wavResp.arrayBuffer());
+
     const norm = await normalizeLoudness(wavBuffer);
     const looped = await renderLoopVersion(norm);
 
     const baseKey = `users/${job.userId}/jobs/${jobId}/take_${i + 1}`;
-    await storage.putObject({ key: `${baseKey}.wav`, contentType: "audio/wav", body: norm });
-    await storage.putObject({ key: `${baseKey}_loop.wav`, contentType: "audio/wav", body: looped });
+    await storage.putObject({ key: `${baseKey}.mp3`, contentType: "audio/mpeg", body: norm });
+    await storage.putObject({ key: `${baseKey}_loop.mp3`, contentType: "audio/mpeg", body: looped });
 
     let stemsZipKey: string | undefined;
     if (a.stemsUrls?.length) {
-      const zipBuf = await zipBuffers(
-        a.stemsUrls.map((_, idx) => ({ name: `stem_${idx + 1}.wav`, data: Buffer.from(`STEM_${idx + 1}`) }))
+      const stemBuffers = await Promise.all(
+        a.stemsUrls.map(async (url, idx) => {
+          const stemResp = await fetch(url);
+          if (!stemResp.ok || !stemResp.body) throw new Error(`Failed to download stem ${idx}`);
+          const data = Buffer.from(await stemResp.arrayBuffer());
+          return { name: `stem_${idx + 1}.wav`, data };
+        })
       );
+      const zipBuf = await zipBuffers(stemBuffers);
       await storage.putObject({ key: `${baseKey}_stems.zip`, contentType: "application/zip", body: zipBuf });
       stemsZipKey = `${baseKey}_stems.zip`;
     }
@@ -54,8 +67,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: str
         bpm: (job.payloadJson as { bpm?: number }).bpm ?? 120,
         key: null,
         duration: (job.payloadJson as { duration?: number }).duration ?? 30,
-        wavUrl: `${baseKey}.wav`,
-        loopUrl: `${baseKey}_loop.wav`,
+        wavUrl: `${baseKey}.mp3`,
+        loopUrl: `${baseKey}_loop.mp3`,
         stemsZipUrl: stemsZipKey,
         licenseUrl: `${baseKey}_license.txt`,
       },
