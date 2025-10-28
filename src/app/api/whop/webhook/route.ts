@@ -28,11 +28,21 @@ export async function POST(req: NextRequest) {
 
     const body = JSON.parse(raw);
     const eventType: string | undefined = body?.type || body?.event;
-    // Minimal validation; ideally verify signature if provided by Whop
-    const userId: string | undefined = body?.userId || body?.user?.id || body?.data?.userId || body?.data?.user?.id;
-    const accessPassId: string | undefined = body?.accessPassId || body?.data?.accessPassId;
-    const experienceId: string | undefined = body?.experienceId || body?.data?.experienceId;
-    if (!userId || !accessPassId) return NextResponse.json({ ok: false });
+    // Extract user ID from various possible paths
+    const userId: string | undefined = body?.userId || body?.user?.id || body?.data?.userId || body?.data?.user?.id || body?.data?.user_id;
+    // Extract access pass ID (for access passes)
+    const accessPassId: string | undefined = body?.accessPassId || body?.data?.accessPassId || body?.data?.access_pass_id || body?.data?.product_id;
+    // Extract experience ID (for subscription plans)
+    const experienceId: string | undefined = body?.experienceId || body?.data?.experienceId || body?.data?.experience_id || body?.data?.plan_id;
+
+    // Log webhook for debugging
+    console.log('Whop webhook received:', { eventType, userId, accessPassId, experienceId });
+
+    // Accept if we have userId and EITHER accessPassId OR experienceId
+    if (!userId || (!accessPassId && !experienceId)) {
+      console.error('Webhook missing required fields:', { userId, accessPassId, experienceId });
+      return NextResponse.json({ ok: false }, { status: 400 });
+    }
 
     const prisma = getPrisma();
     // Map Access Pass or Experience to plan
@@ -77,8 +87,9 @@ export async function POST(req: NextRequest) {
       await prisma.user.update({ where: { id: user.id }, data: { plan: Plan.STARTER } });
     }
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ ok: false });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
 
