@@ -3,11 +3,9 @@ import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
 import { decrementCreditsAtomically } from "@/lib/credits";
 import { verifyWhopFromRequest, getOrCreateAndSyncUser } from "@/lib/auth";
-import { getStorage } from "@/lib/storage/s3";
-import { normalizeLoudness, renderLoopVersion } from "@/lib/processing/audio";
-import { env } from "@/lib/env";
 import { whopSdk, plans as whopPlans, passes as whopPasses } from "@/lib/whop";
-import { Plan } from "@prisma/client";
+import { getMusicClient } from "@/lib/music/elevenlabs";
+import { JobStatus, Plan } from "@prisma/client";
 
 const composeSchema = z.object({
   vibe: z.string().min(1),
@@ -22,84 +20,141 @@ const composeSchema = z.object({
   streamingPreview: z.boolean().optional(),
 });
 
-type ErrorBody = { error: string };
+type ErrorBody = { error: string; requiredPlan?: "PRO" | "STUDIO"; message?: string; suggestedPrompt?: string };
+
+const bannedPromptTerms = [
+  "taylor swift",
+  "drake",
+  "olivia rodrigo",
+  "post malone",
+  "weeknd",
+  "weekend",
+  "bad bunny",
+  "billie eilish",
+  "dualipa",
+  "dua lipa",
+  "metallica",
+  "beatles",
+  "ariana grande",
+  "justin bieber",
+  "rihanna",
+  "lady gaga",
+  "eminem",
+  "journey",
+  "nirvana",
+];
+
+const planCaps: Record<Plan, { maxDuration: number; maxBatch: number }> = {
+  STARTER: { maxDuration: 30, maxBatch: 2 },
+  PRO: { maxDuration: 60, maxBatch: 4 },
+  STUDIO: { maxDuration: 120, maxBatch: 10 },
+};
+
+const planFeatures: Record<Plan, { allowStems: boolean; allowVocals: boolean; allowReusePlan: boolean }> = {
+  STARTER: { allowStems: false, allowVocals: false, allowReusePlan: false },
+  PRO: { allowStems: true, allowVocals: true, allowReusePlan: true },
+  STUDIO: { allowStems: true, allowVocals: true, allowReusePlan: true },
+};
+
+function findBlockedTerm(prompt: string): string | null {
+  const normalized = prompt.toLowerCase();
+  if (normalized.includes("lyrics")) return "lyrics";
+  for (const term of bannedPromptTerms) {
+    if (normalized.includes(term)) return term;
+  }
+  const byPattern = /\bby\s+[a-z0-9\s]+/i;
+  if (byPattern.test(prompt)) return "by <artist>";
+  return null;
+}
+
+async function detectWhopPlan(userId: string): Promise<Plan | null> {
+  const expPriority: Array<{ id?: string; plan: Plan }> = [
+    { id: whopPlans.STUDIO, plan: Plan.STUDIO },
+    { id: whopPlans.PRO, plan: Plan.PRO },
+    { id: whopPlans.STARTER, plan: Plan.STARTER },
+  ];
+  for (const { id, plan } of expPriority) {
+    if (!id) continue;
+    const access = await whopSdk.access.checkIfUserHasAccessToExperience({ userId, experienceId: id });
+    if (access.hasAccess) return plan;
+  }
+  const passPriority: Array<{ id?: string; plan: Plan }> = [
+    { id: whopPasses.STUDIO, plan: Plan.STUDIO },
+    { id: whopPasses.PRO, plan: Plan.PRO },
+    { id: whopPasses.STARTER, plan: Plan.STARTER },
+  ];
+  for (const { id, plan } of passPriority) {
+    if (!id) continue;
+    const access = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId, accessPassId: id });
+    if (access.hasAccess) return plan;
+  }
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as unknown;
     const parsed = composeSchema.parse(body);
 
+    const blockedTerm = findBlockedTerm(parsed.vibe);
+    if (blockedTerm) {
+      return NextResponse.json<ErrorBody>(
+        {
+          error: "PROMPT_BLOCKED",
+          message: `Prompt cannot mention specific artists or lyrics (found: ${blockedTerm}).`,
+        },
+        { status: 422 },
+      );
+    }
+
     const prisma = getPrisma();
     const verified = await verifyWhopFromRequest(req);
     const user = await getOrCreateAndSyncUser(verified.userId, undefined);
 
-    // One-time free generation for new users (no paywall, no credits charged)
     const freeTrialEvent = await prisma.event.findFirst({ where: { userId: user.id, type: "FREE_TRIAL_USED" } });
     const trialEligible = !freeTrialEvent;
 
-    // Whop entitlement check: consider Experience (plan) or Access Pass; auto-sync user plan if higher
-    let hasAccess = true;
+    let hasAccess = user.plan !== Plan.STARTER;
     try {
-      // Check experiences (STARTER, PRO, STUDIO) and access passes; pick highest access
-      const expMap: Array<{ id?: string; plan: Plan }> = [
-        { id: whopPlans.STUDIO, plan: Plan.STUDIO },
-        { id: whopPlans.PRO, plan: Plan.PRO },
-        { id: whopPlans.STARTER, plan: Plan.STARTER },
-      ];
-      const passMap: Array<{ id?: string; plan: Plan }> = [
-        { id: whopPasses.STUDIO, plan: Plan.STUDIO },
-        { id: whopPasses.PRO, plan: Plan.PRO },
-        { id: whopPasses.STARTER, plan: Plan.STARTER },
-      ];
-      let detectedPlan: Plan | null = null;
-      for (const { id, plan } of expMap) {
-        if (!id) continue;
-        const r = await whopSdk.access.checkIfUserHasAccessToExperience({ userId: verified.userId, experienceId: id });
-        if (r.hasAccess) { detectedPlan = plan; break; }
-      }
-      if (!detectedPlan) {
-        for (const { id, plan } of passMap) {
-          if (!id) continue;
-          const r = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId: verified.userId, accessPassId: id });
-          if (r.hasAccess) { detectedPlan = plan; break; }
-        }
-      }
-      // If we detected an entitlement higher than current user.plan, sync
+      const detectedPlan = await detectWhopPlan(verified.userId);
       if (detectedPlan && detectedPlan !== user.plan) {
-        const prisma = getPrisma();
         const baseline = detectedPlan === Plan.STUDIO ? 700 : detectedPlan === Plan.PRO ? 200 : 50;
         const newCredits = Math.max(user.credits, baseline);
         await prisma.user.update({ where: { id: user.id }, data: { plan: detectedPlan, credits: newCredits } });
         user.plan = detectedPlan;
         user.credits = newCredits;
       }
-      // Access is true if any entitlement exists; otherwise rely on trial
-      hasAccess = Boolean(detectedPlan);
+      hasAccess = Boolean(detectedPlan) || user.plan !== Plan.STARTER;
     } catch {
-      hasAccess = true; // fail-open to avoid blocking legitimate users if SDK errors
+      hasAccess = user.plan !== Plan.STARTER;
     }
+
     if (!hasAccess && !trialEligible) {
       return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
     }
 
-    // Enforce per-plan caps to match UI
-    const caps: Record<Plan, { maxDuration: number; maxBatch: number }> = {
-      STARTER: { maxDuration: 30, maxBatch: 2 },
-      PRO: { maxDuration: 60, maxBatch: 4 },
-      STUDIO: { maxDuration: 120, maxBatch: 10 },
-    };
-    const userCaps = caps[user.plan];
+    const userCaps = planCaps[user.plan];
     if (parsed.duration > userCaps.maxDuration) {
-      const requiredPlan = parsed.duration <= caps.PRO.maxDuration ? "PRO" : "STUDIO";
-      return NextResponse.json({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
+      const requiredPlan = parsed.duration <= planCaps.PRO.maxDuration ? "PRO" : "STUDIO";
+      return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
     }
     if (parsed.batch > userCaps.maxBatch) {
-      const requiredPlan = parsed.batch <= caps.PRO.maxBatch ? "PRO" : "STUDIO";
-      return NextResponse.json({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
+      const requiredPlan = parsed.batch <= planCaps.PRO.maxBatch ? "PRO" : "STUDIO";
+      return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
     }
 
-    // Credits cost: charge per 30s block per variation, unless trialEligible without access
-    const creditUnits = Math.max(1, Math.ceil(parsed.duration / 30)) * parsed.batch;
+    const features = planFeatures[user.plan];
+    if (parsed.vocals && !features.allowVocals) {
+      return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan: "PRO" }, { status: 403 });
+    }
+    if (parsed.stems && !features.allowStems) {
+      return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan: "PRO" }, { status: 403 });
+    }
+    if (parsed.reusePlan && !features.allowReusePlan) {
+      return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan: "PRO" }, { status: 403 });
+    }
+
+    const creditUnits = parsed.batch;
     if (hasAccess || !trialEligible) {
       try {
         await decrementCreditsAtomically(user.id, creditUnits);
@@ -112,127 +167,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Direct compose against ElevenLabs and return assets immediately
-    if (!env.ELEVENLABS_API_KEY) {
-      return NextResponse.json<ErrorBody>({ error: "MISSING_ELEVENLABS_API_KEY" }, { status: 500 });
-    }
-
-    const storage = getStorage();
-    const assetsOut: Array<{ id: string; title: string; bpm: number; key: string | null; duration: number; wavUrl: string; loopUrl: string; stemsZipUrl?: string | null; licenseUrl: string }> = [];
-
-    // Create a Job row for traceability (COMPLETED immediately after saves)
-    const job = await prisma.job.create({
-      data: { userId: user.id, status: "PROCESSING", payloadJson: parsed },
+    const promptText = parsed.vibe + (parsed.vocals ? ", with vocals" : "");
+    const music = getMusicClient();
+    const { jobId: remoteJobId } = await music.createGenerateJob({
+      prompt: promptText,
+      bpm: parsed.bpm,
+      duration: parsed.duration,
+      structure: parsed.structure,
+      seed: parsed.seed,
+      stems: parsed.stems,
+      variations: parsed.batch,
     });
 
-    for (let i = 0; i < parsed.batch; i++) {
-      const baseKey = `users/${user.id}/jobs/${job.id}/take_${i + 1}`;
-      const promptText = parsed.vibe + (parsed.vocals ? ", with vocals" : "");
-      // Optionally reuse a composition plan: create a guided plan from prompt & duration
-      let compositionPlan: unknown | undefined;
-      if (parsed.reusePlan) {
-        const planRes = await fetch("https://api.elevenlabs.io/v1/music/composition-plan/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "xi-api-key": env.ELEVENLABS_API_KEY, Accept: "application/json" },
-          body: JSON.stringify({ prompt: promptText, music_length_ms: parsed.duration * 1000 }),
-        });
-        if (planRes.ok) {
-          compositionPlan = await planRes.json().catch(() => undefined);
-        } else if (planRes.status === 400) {
-          const errText = await planRes.text().catch(() => "");
-          try {
-            const detail = JSON.parse(errText) as { detail?: { message?: string; data?: { prompt_suggestion?: string } } };
-            const suggestion = detail?.detail?.data?.prompt_suggestion;
-            if (suggestion) {
-              return NextResponse.json({ error: "BAD_PROMPT", message: detail?.detail?.message ?? "Prompt violates policy", suggestedPrompt: suggestion }, { status: 422 });
-            }
-          } catch {}
-          throw new Error(`ELEVENLABS_${planRes.status}${errText ? ":" + errText : ""}`);
-        } else {
-          const errText = await planRes.text().catch(() => "");
-          throw new Error(`ELEVENLABS_${planRes.status}${errText ? ":" + errText : ""}`);
-        }
-      }
+    await prisma.job.upsert({
+      where: { id: remoteJobId },
+      create: {
+        id: remoteJobId,
+        userId: user.id,
+        status: JobStatus.QUEUED,
+        payloadJson: { ...parsed, prompt: promptText },
+      },
+      update: {
+        userId: user.id,
+        status: JobStatus.QUEUED,
+        payloadJson: { ...parsed, prompt: promptText },
+      },
+    });
 
-      // Persist composition plan alongside the asset key for later reuse/edit
-      if (compositionPlan) {
-        await storage.putObject({ key: `${baseKey}_plan.json`, contentType: "application/json", body: Buffer.from(JSON.stringify(compositionPlan)) });
-      }
-
-      const bodyPayload = compositionPlan
-        ? { composition_plan: compositionPlan }
-        : { prompt: promptText, music_length_ms: parsed.duration * 1000 };
-
-      const composeRes = await fetch("https://api.elevenlabs.io/v1/music/compose", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": env.ELEVENLABS_API_KEY,
-          Accept: "audio/mpeg",
-        },
-        body: JSON.stringify(bodyPayload),
-      });
-      if (!composeRes.ok) {
-        const errText = await composeRes.text().catch(() => "");
-        if (composeRes.status === 400) {
-          try {
-            const detail = JSON.parse(errText) as { detail?: { message?: string; data?: { prompt_suggestion?: string } } };
-            const suggestion = detail?.detail?.data?.prompt_suggestion;
-            if (suggestion) {
-              return NextResponse.json({ error: "BAD_PROMPT", message: detail?.detail?.message ?? "Prompt violates policy", suggestedPrompt: suggestion }, { status: 422 });
-            }
-          } catch {}
-        }
-        throw new Error(`ELEVENLABS_${composeRes.status}${errText ? ":" + errText : ""}`);
-      }
-      const arrayBuf = await composeRes.arrayBuffer();
-      const audioBuf = Buffer.from(arrayBuf);
-
-      const norm = await normalizeLoudness(audioBuf);
-      const looped = await renderLoopVersion(norm);
-
-      // Store MP3 outputs to match Eleven Music default; loop version as mp3 too
-      await storage.putObject({ key: `${baseKey}.mp3`, contentType: "audio/mpeg", body: norm });
-      await storage.putObject({ key: `${baseKey}_loop.mp3`, contentType: "audio/mpeg", body: looped });
-
-      // Generate signed URLs for immediate playback and download
-      const wavSigned = await storage.getSignedUrl({ key: `${baseKey}.mp3`, method: "GET" });
-      const loopSigned = await storage.getSignedUrl({ key: `${baseKey}_loop.mp3`, method: "GET" });
-
-      const asset = await prisma.asset.create({
-        data: {
-          userId: user.id,
-          jobId: job.id,
-          title: parsed.vibe,
-          bpm: parsed.bpm,
-          key: null,
-          duration: parsed.duration,
-          wavUrl: `${baseKey}.mp3`,
-          loopUrl: `${baseKey}_loop.mp3`,
-          stemsZipUrl: null,
-          licenseUrl: `${baseKey}_license.txt`,
-        },
-      });
-      assetsOut.push({ id: asset.id, title: asset.title, bpm: asset.bpm, key: asset.key, duration: asset.duration, wavUrl: wavSigned.url, loopUrl: loopSigned.url, stemsZipUrl: asset.stemsZipUrl, licenseUrl: asset.licenseUrl });
-    }
-
-    await prisma.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
-
-    const res = NextResponse.json({ assets: assetsOut, trialUsed: !hasAccess && trialEligible });
+    const response = NextResponse.json({ jobId: remoteJobId, trialUsed: !hasAccess && trialEligible });
     try {
-      // Persist user id for future asset listing/downloads when Whop headers are absent
-      res.cookies.set("musician_uid", user.id, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", secure: true });
+      response.cookies.set("musician_uid", user.id, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", secure: true });
     } catch {}
-    // Mark free trial consumed if applicable
+
     if (!hasAccess && trialEligible) {
       try {
         await prisma.event.create({ data: { userId: user.id, type: "FREE_TRIAL_USED", payloadJson: { at: new Date().toISOString() } } });
       } catch {}
     }
-    return res;
+
+    return response;
   } catch (err) {
     const message = err instanceof Error ? err.message : "UNKNOWN_ERROR";
     return NextResponse.json<ErrorBody>({ error: message }, { status: 400 });
   }
 }
-

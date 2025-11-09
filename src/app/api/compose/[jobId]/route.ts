@@ -20,6 +20,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: str
   }
 
   if (st.status !== "completed") {
+    const nextStatus = st.status === "processing" ? "PROCESSING" : "QUEUED";
+    if (job.status !== nextStatus) {
+      await prisma.job.update({ where: { id: jobId }, data: { status: nextStatus } });
+    }
     return NextResponse.json({ status: st.status });
   }
 
@@ -59,25 +63,38 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: str
       stemsZipKey = `${baseKey}_stems.zip`;
     }
 
+    const payload = job.payloadJson as { bpm?: number; duration?: number; vibe?: string };
     const asset = await prisma.asset.create({
       data: {
         userId: job.userId,
         jobId: job.id,
-        title: `Track ${i + 1}`,
-        bpm: (job.payloadJson as { bpm?: number }).bpm ?? 120,
+        title: payload?.vibe ? `${payload.vibe}` : `Track ${i + 1}`,
+        bpm: payload?.bpm ?? 120,
         key: null,
-        duration: (job.payloadJson as { duration?: number }).duration ?? 30,
+        duration: payload?.duration ?? 30,
         wavUrl: `${baseKey}.mp3`,
         loopUrl: `${baseKey}_loop.mp3`,
         stemsZipUrl: stemsZipKey,
         licenseUrl: `${baseKey}_license.txt`,
       },
     });
-    assetsOut.push({ id: asset.id, title: asset.title, bpm: asset.bpm, key: asset.key, duration: asset.duration, wavUrl: asset.wavUrl, loopUrl: asset.loopUrl, stemsZipUrl: asset.stemsZipUrl, licenseUrl: asset.licenseUrl });
+    const wavSigned = await storage.getSignedUrl({ key: `${baseKey}.mp3`, method: "GET" });
+    const loopSigned = await storage.getSignedUrl({ key: `${baseKey}_loop.mp3`, method: "GET" });
+    const stemsSigned = stemsZipKey ? await storage.getSignedUrl({ key: stemsZipKey, method: "GET" }) : null;
+    assetsOut.push({
+      id: asset.id,
+      title: asset.title,
+      bpm: asset.bpm,
+      key: asset.key,
+      duration: asset.duration,
+      wavUrl: wavSigned.url,
+      loopUrl: loopSigned.url,
+      stemsZipUrl: stemsSigned?.url ?? null,
+      licenseUrl: asset.licenseUrl,
+    });
   }
 
   await prisma.job.update({ where: { id: jobId }, data: { status: "COMPLETED", completedAt: new Date() } });
 
   return NextResponse.json({ assets: assetsOut });
 }
-

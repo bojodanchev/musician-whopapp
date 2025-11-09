@@ -5,10 +5,17 @@ import Link from "next/link";
 import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight, Mic, RefreshCw } from "lucide-react";
 import { useIframeSdk } from "@whop/react";
 import OnboardingWizard from "@/components/OnboardingWizard";
+import PresetButtons, { PresetOption } from "@/components/PresetButtons";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
+
+const PLAN_CAPS = {
+  STARTER: { maxDuration: 30, maxBatch: 2, allowStreaming: false, allowAdvanced: false, allowVocals: false, allowStems: false },
+  PRO: { maxDuration: 60, maxBatch: 4, allowStreaming: true, allowAdvanced: true, allowVocals: true, allowStems: true },
+  STUDIO: { maxDuration: 120, maxBatch: 10, allowStreaming: true, allowAdvanced: true, allowVocals: true, allowStems: true },
+} as const;
 
 export default function MusicianApp() {
   type AssetOut = {
@@ -30,16 +37,18 @@ export default function MusicianApp() {
 
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(30);
+  const [bpm, setBpm] = useState(120);
   const [batch, setBatch] = useState(1);
   const [isGenerating, setGenerating] = useState(false);
   const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
   const [items, setItems] = useState(
-    [] as Array<{ id: string; title: string; bpm: number; key: string; duration: number; date: string; url: string; preview?: boolean }>
+    [] as Array<{ id: string; title: string; bpm: number; key: string; duration: number; date: string; loopUrl: string; hasStems?: boolean; preview?: boolean }>
   );
   const [upgradeBanner, setUpgradeBanner] = useState<null | { requiredPlan: "PRO" | "STUDIO" }>(null);
   const [vocals, setVocals] = useState(false);
   const [reusePlan, setReusePlan] = useState(false);
   const [streamPreview, setStreamPreview] = useState(false);
+  const [includeStems, setIncludeStems] = useState(false);
   const generateBtnRef = useRef<HTMLButtonElement | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showVariants, setShowVariants] = useState(false);
@@ -54,15 +63,9 @@ export default function MusicianApp() {
   type IframeSdk = { inAppPurchase?: (opts: { planId: string }) => Promise<void> } | null;
   const iframeSdk = (useIframeSdk?.() as unknown as IframeSdk) || null;
 
-  const planCaps = {
-    STARTER: { maxDuration: 30, maxBatch: 2, allowStreaming: false, allowAdvanced: false, allowVocals: false },
-    PRO: { maxDuration: 60, maxBatch: 4, allowStreaming: true, allowAdvanced: true, allowVocals: true },
-    STUDIO: { maxDuration: 120, maxBatch: 10, allowStreaming: true, allowAdvanced: true, allowVocals: true },
-  } as const;
-
   function currentCaps() {
-    if (!plan) return planCaps.STARTER;
-    return planCaps[plan];
+    if (!plan) return PLAN_CAPS.STARTER;
+    return PLAN_CAPS[plan];
   }
 
   function ToggleChip({ enabled, onClick, label, icon: Icon, tooltip }: { enabled: boolean; onClick: () => void; label: string; icon: React.ComponentType<{ className?: string }>; tooltip: string }) {
@@ -120,6 +123,18 @@ export default function MusicianApp() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [showVariants, showDuration]);
 
+  useEffect(() => {
+    const caps = plan ? PLAN_CAPS[plan] : PLAN_CAPS.STARTER;
+    if (!caps.allowStems) setIncludeStems(false);
+  }, [plan]);
+
+  const handlePresetPick = (preset: PresetOption) => {
+    setPrompt(preset.prompt);
+    setDuration(preset.duration);
+    setBpm(preset.bpm);
+    setTimeout(() => generateBtnRef.current?.focus(), 50);
+  };
+
   const handlePreview = async () => {
     try {
       setGenerating(true);
@@ -133,7 +148,7 @@ export default function MusicianApp() {
       const blob = new Blob([arrayBuf], { type: "audio/mpeg" });
       const url = URL.createObjectURL(blob);
       const id = `preview_${Date.now()}`;
-      const item = { id, title: prompt, bpm: 120, key: "-", duration, date: "Preview", url, preview: true };
+      const item = { id, title: prompt || "Preview take", bpm, key: "-", duration, date: "Preview", loopUrl: url, hasStems: false, preview: true };
       setItems((cur) => [item, ...cur]);
       // Do not autoplay; wait for explicit user action
     } catch (e) {
@@ -157,12 +172,12 @@ export default function MusicianApp() {
         credentials: "include",
         body: JSON.stringify({
           vibe: prompt,
-          bpm: 120,
+          bpm,
           duration: clamp(Number(duration) || 30, 5, 120),
           structure: "intro-drop-outro",
           seed: undefined,
           batch: clamp(Number(batch) || 1, 1, 10),
-          stems: false,
+          stems: includeStems,
           vocals,
           reusePlan,
           streamingPreview: streamPreview,
@@ -182,11 +197,12 @@ export default function MusicianApp() {
         const added = (result.assets as AssetOut[]).map((a, idx) => ({
           id: a.id ?? `${Date.now()}_${idx}`,
           title: prompt,
-          bpm: 120,
+          bpm,
           key: "-",
           duration,
           date: "Just now",
-          url: a.loopUrl,
+          loopUrl: a.loopUrl,
+          hasStems: Boolean(a.stemsZipUrl),
         }));
         setItems((cur) => [...added, ...cur]);
       } else if ("jobId" in result) {
@@ -201,11 +217,12 @@ export default function MusicianApp() {
             const added = data.assets.map((a, idx) => ({
               id: `${result.jobId}_${idx}`,
               title: prompt,
-              bpm: 120,
+              bpm,
               key: "-",
               duration,
               date: "Just now",
-              url: a.loopUrl,
+              loopUrl: a.loopUrl,
+              hasStems: Boolean((a as AssetOut).stemsZipUrl),
             }));
             setItems((cur) => [...added, ...cur]);
           }
@@ -233,11 +250,11 @@ export default function MusicianApp() {
         credentials: "include",
         body: JSON.stringify({
           vibe: prompt,
-          bpm: 120,
+          bpm,
           duration: clamp(Number(duration) || 30, 5, 120),
           structure: "intro-drop-outro",
           batch: 1,
-          stems: false,
+          stems: includeStems,
           vocals,
           reusePlan,
           streamingPreview: false,
@@ -254,7 +271,7 @@ export default function MusicianApp() {
       const result = await resp.json();
       if (result?.assets && Array.isArray(result.assets) && result.assets.length > 0) {
         const a = result.assets[0] as AssetOut;
-        setItems((cur) => cur.map((it) => (it.id === previewId ? { ...it, id: a.id ?? previewId, url: a.loopUrl, date: "Just now", preview: false } : it)));
+        setItems((cur) => cur.map((it) => (it.id === previewId ? { ...it, id: a.id ?? previewId, loopUrl: a.loopUrl, date: "Just now", preview: false, hasStems: Boolean(a.stemsZipUrl) } : it)));
       }
       try {
         const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
@@ -285,8 +302,8 @@ export default function MusicianApp() {
       try {
         const a = await fetch("/api/assets", { credentials: "include", cache: "no-store" }).then((r)=> r.json());
         if (Array.isArray(a?.assets)) {
-          const mapped = (a.assets as Array<{ id: string; title: string; bpm?: number; key?: string | null; duration?: number; loopUrl: string }>)
-            .map((asset) => ({ id: asset.id, title: asset.title, bpm: asset.bpm ?? 120, key: (asset.key ?? "-") as string, duration: asset.duration ?? 30, date: "Just now", url: asset.loopUrl }));
+          const mapped = (a.assets as Array<{ id: string; title: string; bpm?: number; key?: string | null; duration?: number; loopUrl: string; stemsZipUrl?: string | null }>)
+            .map((asset) => ({ id: asset.id, title: asset.title, bpm: asset.bpm ?? 120, key: (asset.key ?? "-") as string, duration: asset.duration ?? 30, date: "Just now", loopUrl: asset.loopUrl, hasStems: Boolean(asset.stemsZipUrl) }));
           setItems(mapped);
         }
       } catch {}
@@ -305,14 +322,14 @@ export default function MusicianApp() {
     })();
   }, []);
 
-  function togglePlay(it: { id: string; url: string }) {
+  function togglePlay(it: { id: string; loopUrl: string }) {
     const a = audioRef.current;
     if (!a) return;
     if (playingId === it.id) {
       if (isPlaying) { a.pause(); setIsPlaying(false); } else { void a.play(); setIsPlaying(true); }
       return;
     }
-    a.src = it.url;
+    a.src = it.loopUrl;
     a.currentTime = 0;
     setPlayingId(it.id);
     setProgress(0);
@@ -371,6 +388,10 @@ export default function MusicianApp() {
                 rows={2}
                 className="w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 md:py-4 focus:outline-none focus:ring-2 focus:ring-white/20 text-base min-h-[72px]"
               />
+              <div>
+                <div className="text-xs uppercase text-white/60 mb-1">Presets</div>
+                <PresetButtons onPick={handlePresetPick} />
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-2 text-sm text-white/80 relative">
                 {/* Variants trigger */}
@@ -467,8 +488,24 @@ export default function MusicianApp() {
                 </div>
                 {/* Close inner controls row */}
                 </div>
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <label className="text-xs uppercase text-white/50">BPM</label>
+                  <input
+                    type="number"
+                    min={40}
+                    max={220}
+                    value={bpm}
+                    onChange={(e)=>setBpm(clamp(Number(e.target.value)||120,40,220))}
+                    className="w-20 bg-black/40 border border-white/10 rounded-xl px-2 py-1"
+                  />
+                </div>
                 {/* Pro/Studio toggles with upgrade-on-click behavior */}
                 <div className="flex items-center gap-2">
+                  {currentCaps().allowStems ? (
+                    <ToggleChip enabled={includeStems} onClick={()=>setIncludeStems((v)=>!v)} label="Stems" icon={Download} tooltip="Return instrument stems as a ZIP." />
+                  ) : (
+                    <ToggleChip enabled={false} onClick={()=>upgradeTo("PRO")} label="Stems (Pro)" icon={Download} tooltip="Upgrade to download stem ZIPs." />
+                  )}
                   {currentCaps().allowVocals ? (
                     <ToggleChip enabled={vocals} onClick={()=>setVocals((v)=>!v)} label="Vocals" icon={Mic} tooltip="Ask the model to include vocals and melodies." />
                   ) : (
@@ -503,7 +540,7 @@ export default function MusicianApp() {
               {items.map((it) => (
                 <motion.div key={it.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <div className="font-medium truncate mb-1">{it.title}</div>
-                  <div className="text-xs text-white/60">{it.duration}s • Just now</div>
+                  <div className="text-xs text-white/60">{it.duration}s • {it.bpm} BPM</div>
                   <div className="mt-4 flex items-center gap-2">
                     <button onClick={() => togglePlay(it)} className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2 hover:bg-white/15">
                       <PlayCircle className="size-4" /> {playingId===it.id && isPlaying? "Pause" : "Play"}
@@ -514,7 +551,12 @@ export default function MusicianApp() {
                     {it.preview ? (
                       <button onClick={() => saveFromPreview(it.id)} className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#7b5cff] via-[#ff4d9d] to-[#35a1ff] border border-white/10 flex items-center gap-2">Save</button>
                     ) : (
-                      <a href={`/api/assets/${encodeURIComponent(it.id)}/download?type=wav`} className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2 hover:bg-white/15"><Download className="size-4" /> Download</a>
+                      <>
+                        <a href={`/api/assets/${encodeURIComponent(it.id)}/download?type=wav`} className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2 hover:bg-white/15"><Download className="size-4" /> Download</a>
+                        {it.hasStems && (
+                          <a href={`/api/assets/${encodeURIComponent(it.id)}/download?type=stems`} className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 flex items-center gap-2 hover:bg-white/15"><Layers className="size-4" /> Stems</a>
+                        )}
+                      </>
                     )}
                   </div>
                 </motion.div>
@@ -529,5 +571,3 @@ export default function MusicianApp() {
     </div>
   );
 }
-
-
