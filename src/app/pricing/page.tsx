@@ -4,7 +4,7 @@ import { CreditCard } from "lucide-react";
 const plans = [
   { name: "Starter", price: "$29/mo", blurb: "150 credits, 30s max, loops only" },
   { name: "Pro", price: "$79/mo", blurb: "600 credits, stems, batch up to 10" },
-  { name: "Studio", price: "$199/mo", blurb: "2000 credits, team seats (x5)" },
+  { name: "Studio", price: "$199/mo", blurb: "2000 credits, team seats (x5), webhooks" },
 ];
 
 export default function PricingPage() {
@@ -31,4 +31,3 @@ export default function PricingPage() {
     </div>
   );
 }
-

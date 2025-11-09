@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { passes, plans } from "@/lib/whop";
+import { PLAN_BASELINE_CREDITS, PlanName } from "@/lib/plans";
 import { Plan } from "@prisma/client";
 import crypto from "crypto";
 
@@ -52,8 +53,7 @@ export async function POST(req: NextRequest) {
     if (accessPassId === passes.STUDIO || experienceId === plans.STUDIO) plan = Plan.STUDIO;
     if (!plan) return NextResponse.json({ ok: true });
 
-    const STARTER = 50; const PRO = 200; const STUDIO = 700;
-    const creditsByPlan: Record<Plan, number> = { STARTER, PRO, STUDIO } as const;
+    const creditsByPlan: Record<Plan, number> = PLAN_BASELINE_CREDITS as Record<PlanName, number>;
 
     // Upsert user by whopUserId and top-up credits to at least their plan baseline on renewal/purchase
     const user = await prisma.user.upsert({
@@ -92,5 +92,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
-
 

@@ -166,9 +166,9 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
           <p className="text-white/60 text-xs mt-2">Flexible payment options: Monthly billing or 100+ payment methods including Klarna, Afterpay, and installment plans</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <PlanCard plan="STARTER" title="Starter" price="$9.99/mo" features={["50 generations/mo","30s max","Loops"]} generateHref={`/experiences/${experienceId}/generate`} />
-          <PlanCard plan="PRO" title="Pro" price="$29.99/mo" features={["200 generations/mo","Batch x4","Streaming preview"]} generateHref={`/experiences/${experienceId}/generate`} />
-          <PlanCard plan="STUDIO" title="Studio" price="$49.99/mo" features={["700 generations/mo","Batch x10","Advanced plan editor"]} generateHref={`/experiences/${experienceId}/generate`} />
+          <PlanCard plan="STARTER" title="Starter" price="$29/mo" features={["150 credits/mo","30s max loops","Loops only"]} generateHref={`/experiences/${experienceId}/generate`} />
+          <PlanCard plan="PRO" title="Pro" price="$79/mo" features={["600 credits/mo","Batch up to 10","Stems + streaming preview"]} generateHref={`/experiences/${experienceId}/generate`} />
+          <PlanCard plan="STUDIO" title="Studio" price="$199/mo" features={["2000 credits/mo","Team seats (x5)","Webhooks & API"]} generateHref={`/experiences/${experienceId}/generate`} />
         </div>
       </section>
 
@@ -210,5 +210,4 @@ export default function ExperiencePage({ params }: { params: { experienceId: str
     </main>
   );
 }
-
 

@@ -1,4 +1,5 @@
 import { WhopServerSdk } from "@whop/api";
+import { PLAN_BASELINE_CREDITS } from "@/lib/plans";
 
 const APP_ID = process.env.NEXT_PUBLIC_WHOP_APP_ID;
 const APP_API_KEY = process.env.WHOP_API_KEY;
@@ -66,9 +67,4 @@ export const WHOP_PLAN_CAPS = {
 } as const;
 
 // Suggested monthly baseline credits aligned to Eleven costs (~650 credits per 30s gen)
-export const PLAN_BASELINE_CREDITS = {
-  STARTER: 50,
-  PRO: 200,
-  STUDIO: 600,
-} as const;
-
+export { PLAN_BASELINE_CREDITS };

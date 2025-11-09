@@ -3,9 +3,10 @@ import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
 import { decrementCreditsAtomically } from "@/lib/credits";
 import { verifyWhopFromRequest, getOrCreateAndSyncUser } from "@/lib/auth";
-import { whopSdk, plans as whopPlans, passes as whopPasses } from "@/lib/whop";
 import { getMusicClient } from "@/lib/music/elevenlabs";
 import { JobStatus, Plan } from "@prisma/client";
+import { fetchEntitledPlan } from "@/lib/entitlements";
+import { PLAN_BASELINE_CREDITS, PLAN_CAPS, PLAN_FEATURES, PlanName } from "@/lib/plans";
 
 const composeSchema = z.object({
   vibe: z.string().min(1),
@@ -45,18 +46,6 @@ const bannedPromptTerms = [
   "nirvana",
 ];
 
-const planCaps: Record<Plan, { maxDuration: number; maxBatch: number }> = {
-  STARTER: { maxDuration: 30, maxBatch: 2 },
-  PRO: { maxDuration: 60, maxBatch: 4 },
-  STUDIO: { maxDuration: 120, maxBatch: 10 },
-};
-
-const planFeatures: Record<Plan, { allowStems: boolean; allowVocals: boolean; allowReusePlan: boolean }> = {
-  STARTER: { allowStems: false, allowVocals: false, allowReusePlan: false },
-  PRO: { allowStems: true, allowVocals: true, allowReusePlan: true },
-  STUDIO: { allowStems: true, allowVocals: true, allowReusePlan: true },
-};
-
 function findBlockedTerm(prompt: string): string | null {
   const normalized = prompt.toLowerCase();
   if (normalized.includes("lyrics")) return "lyrics";
@@ -65,30 +54,6 @@ function findBlockedTerm(prompt: string): string | null {
   }
   const byPattern = /\bby\s+[a-z0-9\s]+/i;
   if (byPattern.test(prompt)) return "by <artist>";
-  return null;
-}
-
-async function detectWhopPlan(userId: string): Promise<Plan | null> {
-  const expPriority: Array<{ id?: string; plan: Plan }> = [
-    { id: whopPlans.STUDIO, plan: Plan.STUDIO },
-    { id: whopPlans.PRO, plan: Plan.PRO },
-    { id: whopPlans.STARTER, plan: Plan.STARTER },
-  ];
-  for (const { id, plan } of expPriority) {
-    if (!id) continue;
-    const access = await whopSdk.access.checkIfUserHasAccessToExperience({ userId, experienceId: id });
-    if (access.hasAccess) return plan;
-  }
-  const passPriority: Array<{ id?: string; plan: Plan }> = [
-    { id: whopPasses.STUDIO, plan: Plan.STUDIO },
-    { id: whopPasses.PRO, plan: Plan.PRO },
-    { id: whopPasses.STARTER, plan: Plan.STARTER },
-  ];
-  for (const { id, plan } of passPriority) {
-    if (!id) continue;
-    const access = await whopSdk.access.checkIfUserHasAccessToAccessPass({ userId, accessPassId: id });
-    if (access.hasAccess) return plan;
-  }
   return null;
 }
 
@@ -115,36 +80,41 @@ export async function POST(req: NextRequest) {
     const freeTrialEvent = await prisma.event.findFirst({ where: { userId: user.id, type: "FREE_TRIAL_USED" } });
     const trialEligible = !freeTrialEvent;
 
-    let hasAccess = user.plan !== Plan.STARTER;
+    let resolvedPlan: Plan = user.plan ?? Plan.STARTER;
     try {
-      const detectedPlan = await detectWhopPlan(verified.userId);
+      const detectedPlan = await fetchEntitledPlan(verified.userId);
       if (detectedPlan && detectedPlan !== user.plan) {
-        const baseline = detectedPlan === Plan.STUDIO ? 700 : detectedPlan === Plan.PRO ? 200 : 50;
+        const baseline = PLAN_BASELINE_CREDITS[detectedPlan as PlanName];
         const newCredits = Math.max(user.credits, baseline);
         await prisma.user.update({ where: { id: user.id }, data: { plan: detectedPlan, credits: newCredits } });
         user.plan = detectedPlan;
         user.credits = newCredits;
       }
-      hasAccess = Boolean(detectedPlan) || user.plan !== Plan.STARTER;
-    } catch {
-      hasAccess = user.plan !== Plan.STARTER;
+      if (detectedPlan) {
+        resolvedPlan = detectedPlan;
+      }
+    } catch (err) {
+      console.error("Failed to sync entitlements", err);
     }
+
+    const planKey = (resolvedPlan ?? Plan.STARTER) as PlanName;
+    const hasAccess = planKey !== "STARTER";
 
     if (!hasAccess && !trialEligible) {
       return NextResponse.json<ErrorBody>({ error: "FORBIDDEN_PAYWALL" }, { status: 403 });
     }
 
-    const userCaps = planCaps[user.plan];
+    const userCaps = PLAN_CAPS[planKey];
     if (parsed.duration > userCaps.maxDuration) {
-      const requiredPlan = parsed.duration <= planCaps.PRO.maxDuration ? "PRO" : "STUDIO";
+      const requiredPlan = parsed.duration <= PLAN_CAPS.PRO.maxDuration ? "PRO" : "STUDIO";
       return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
     }
     if (parsed.batch > userCaps.maxBatch) {
-      const requiredPlan = parsed.batch <= planCaps.PRO.maxBatch ? "PRO" : "STUDIO";
+      const requiredPlan = parsed.batch <= PLAN_CAPS.PRO.maxBatch ? "PRO" : "STUDIO";
       return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan }, { status: 403 });
     }
 
-    const features = planFeatures[user.plan];
+    const features = PLAN_FEATURES[planKey];
     if (parsed.vocals && !features.allowVocals) {
       return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan: "PRO" }, { status: 403 });
     }
@@ -152,6 +122,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan: "PRO" }, { status: 403 });
     }
     if (parsed.reusePlan && !features.allowReusePlan) {
+      return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan: "PRO" }, { status: 403 });
+    }
+    if (parsed.streamingPreview && !features.allowStreaming) {
       return NextResponse.json<ErrorBody>({ error: "UPGRADE_REQUIRED", requiredPlan: "PRO" }, { status: 403 });
     }
 
@@ -170,30 +143,30 @@ export async function POST(req: NextRequest) {
 
     const promptText = parsed.vibe + (parsed.vocals ? ", with vocals" : "");
     const music = getMusicClient();
-  const { jobId: remoteJobId } = await music.createGenerateJob({
-    prompt: promptText,
-    bpm: parsed.bpm,
-    duration: parsed.duration,
-    structure: parsed.structure,
-    seed: parsed.seed,
-    stems: parsed.stems,
-    variations: parsed.batch,
-  });
+    const { jobId: remoteJobId } = await music.createGenerateJob({
+      prompt: promptText,
+      bpm: parsed.bpm,
+      duration: parsed.duration,
+      structure: parsed.structure,
+      seed: parsed.seed,
+      stems: parsed.stems,
+      variations: parsed.batch,
+    });
 
-  await prisma.job.upsert({
-    where: { id: remoteJobId },
-    create: {
-      id: remoteJobId,
-      userId: user.id,
-      status: JobStatus.QUEUED,
-      payloadJson: { ...parsed, prompt: promptText, shareToForum: Boolean(parsed.shareToForum) },
-    },
-    update: {
-      userId: user.id,
-      status: JobStatus.QUEUED,
-      payloadJson: { ...parsed, prompt: promptText, shareToForum: Boolean(parsed.shareToForum) },
-    },
-  });
+    await prisma.job.upsert({
+      where: { id: remoteJobId },
+      create: {
+        id: remoteJobId,
+        userId: user.id,
+        status: JobStatus.QUEUED,
+        payloadJson: { ...parsed, prompt: promptText, shareToForum: Boolean(parsed.shareToForum) },
+      },
+      update: {
+        userId: user.id,
+        status: JobStatus.QUEUED,
+        payloadJson: { ...parsed, prompt: promptText, shareToForum: Boolean(parsed.shareToForum) },
+      },
+    });
 
     const response = NextResponse.json({ jobId: remoteJobId, trialUsed: !hasAccess && trialEligible });
     try {

@@ -1,21 +1,16 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight, Mic, RefreshCw, Megaphone } from "lucide-react";
 import { useIframeSdk } from "@whop/react";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import PresetButtons, { PresetOption } from "@/components/PresetButtons";
+import { PLAN_CAPS, PlanName } from "@/lib/plans";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
-
-const PLAN_CAPS = {
-  STARTER: { maxDuration: 30, maxBatch: 2, allowStreaming: false, allowAdvanced: false, allowVocals: false, allowStems: false },
-  PRO: { maxDuration: 60, maxBatch: 4, allowStreaming: true, allowAdvanced: true, allowVocals: true, allowStems: true },
-  STUDIO: { maxDuration: 120, maxBatch: 10, allowStreaming: true, allowAdvanced: true, allowVocals: true, allowStems: true },
-} as const;
 
 export default function MusicianApp() {
   type AssetOut = {
@@ -56,13 +51,57 @@ export default function MusicianApp() {
   const [showDuration, setShowDuration] = useState(false);
   const variantsRef = useRef<HTMLDivElement | null>(null);
   const durationRef = useRef<HTMLDivElement | null>(null);
-  const [plan, setPlan] = useState<"STARTER" | "PRO" | "STUDIO" | null>(null);
+  const [plan, setPlan] = useState<PlanName | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   type IframeSdk = { inAppPurchase?: (opts: { planId: string }) => Promise<void> } | null;
   const iframeSdk = (useIframeSdk?.() as unknown as IframeSdk) || null;
+
+  function ensurePlanName(value: unknown): PlanName | null {
+    if (value === "STARTER" || value === "PRO" || value === "STUDIO") {
+      return value;
+    }
+    return null;
+  }
+
+  async function determinePlanViaPaywall(): Promise<PlanName> {
+    const tiers: PlanName[] = ["STUDIO", "PRO"];
+    for (const tier of tiers) {
+      try {
+        const res = await fetch(`/api/whop/paywall?plan=${tier}`, { credentials: "include" });
+        if (!res.ok) continue;
+        const data = (await res.json()) as { experienceAccess?: boolean };
+        if (data?.experienceAccess) return tier;
+      } catch {}
+    }
+    return "STARTER";
+  }
+
+  const refreshDiagnostics = useCallback(async (opts: { fallback?: boolean } = {}): Promise<PlanName | null> => {
+    try {
+      const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
+      if (typeof d?.credits === "number") setCreditsLeft(d.credits);
+      const diagPlan = ensurePlanName(d?.whopUser?.plan ?? d?.plan);
+      if (diagPlan) {
+        setPlan(diagPlan);
+        return diagPlan;
+      }
+    } catch {}
+    if (opts.fallback) {
+      const fallbackPlan = await determinePlanViaPaywall();
+      setPlan(fallbackPlan);
+      return fallbackPlan;
+    }
+    return null;
+  }, []);
+
+  const buyCredits = () => {
+    if (typeof window === "undefined") return;
+    const targetPlan = plan ?? "PRO";
+    window.location.assign(`/api/whop/subscribe?plan=${targetPlan}`);
+  };
 
   function currentCaps() {
     if (!plan) return PLAN_CAPS.STARTER;
@@ -91,7 +130,8 @@ export default function MusicianApp() {
           await iframeSdk.inAppPurchase({ planId: planEnv });
           // Refresh diagnostics and caps after modal success; best effort
           const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
-          if (d?.whopUser?.plan || d?.plan) setPlan((d?.whopUser?.plan ?? d?.plan) as "STARTER" | "PRO" | "STUDIO");
+          const diagPlan = ensurePlanName(d?.whopUser?.plan ?? d?.plan);
+          if (diagPlan) setPlan(diagPlan);
           return;
         }
       }
@@ -136,8 +176,9 @@ export default function MusicianApp() {
   }, [showVariants, showDuration]);
 
   useEffect(() => {
-    const caps = plan ? PLAN_CAPS[plan] : PLAN_CAPS.STARTER;
+    const caps = PLAN_CAPS[(plan ?? "STARTER") as PlanName];
     if (!caps.allowStems) setIncludeStems(false);
+    if (!caps.allowStreaming) setStreamPreview(false);
   }, [plan]);
 
   const handlePresetPick = (preset: PresetOption) => {
@@ -153,9 +194,20 @@ export default function MusicianApp() {
       const resp = await fetch("/api/compose/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ prompt, duration: clamp(Number(duration) || 30, 5, 120) }),
       });
-      if (!resp.ok || !resp.body) throw new Error(`Stream failed: ${resp.status}`);
+      if (!resp.ok) {
+        if (resp.status === 403) {
+          const err = (await resp.json().catch(() => ({}))) as { requiredPlan?: "PRO" | "STUDIO" };
+          if (err?.requiredPlan) {
+            setUpgradeBanner({ requiredPlan: err.requiredPlan });
+            return;
+          }
+        }
+        throw new Error(`Stream failed: ${resp.status}`);
+      }
+      if (!resp.body) throw new Error("No stream body returned");
       const arrayBuf = await resp.arrayBuffer();
       const blob = new Blob([arrayBuf], { type: "audio/mpeg" });
       const url = URL.createObjectURL(blob);
@@ -247,10 +299,7 @@ export default function MusicianApp() {
       alert(e instanceof Error ? e.message : String(e));
     } finally {
       setGenerating(false);
-      try {
-        const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
-        if (typeof d?.credits === "number") setCreditsLeft(d.credits);
-      } catch {}
+      await refreshDiagnostics();
     }
   };
 
@@ -287,41 +336,27 @@ export default function MusicianApp() {
         const a = result.assets[0] as AssetOut;
         setItems((cur) => cur.map((it) => (it.id === previewId ? { ...it, id: a.id ?? previewId, loopUrl: a.loopUrl, date: "Just now", preview: false, hasStems: Boolean(a.stemsZipUrl) } : it)));
       }
-      try {
-        const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
-        if (typeof d?.credits === "number") setCreditsLeft(d.credits);
-      } catch {}
     } catch (e) {
       console.error(e);
       alert(e instanceof Error ? e.message : String(e));
     } finally {
       setGenerating(false);
+      await refreshDiagnostics();
     }
   }
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      try {
-        const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
-        if (typeof d?.credits === "number") setCreditsLeft(d.credits);
-      } catch {}
-      // also get plan
-      try {
-        const d = await fetch("/api/diagnostics", { credentials: "include" }).then((r) => r.json());
-        if (typeof d?.credits === "number") setCreditsLeft(d.credits);
-        const p = (d?.whopUser?.plan ?? d?.plan) as string | undefined;
-        if (p === "STARTER" || p === "PRO" || p === "STUDIO") setPlan(p);
-      } catch {}
-      // load recent assets
+      await refreshDiagnostics({ fallback: true });
       try {
         const a = await fetch("/api/assets", { credentials: "include", cache: "no-store" }).then((r)=> r.json());
-        if (Array.isArray(a?.assets)) {
+        if (!cancelled && Array.isArray(a?.assets)) {
           const mapped = (a.assets as Array<{ id: string; title: string; bpm?: number; key?: string | null; duration?: number; loopUrl: string; stemsZipUrl?: string | null }>)
             .map((asset) => ({ id: asset.id, title: asset.title, bpm: asset.bpm ?? 120, key: (asset.key ?? "-") as string, duration: asset.duration ?? 30, date: "Just now", loopUrl: asset.loopUrl, hasStems: Boolean(asset.stemsZipUrl) }));
           setItems(mapped);
         }
       } catch {}
-      // Setup shared audio element for play/pause/progress
       if (!audioRef.current) {
         audioRef.current = new Audio();
         const a = audioRef.current;
@@ -334,7 +369,8 @@ export default function MusicianApp() {
         a.addEventListener("ended", onEnded);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [refreshDiagnostics]);
 
   function togglePlay(it: { id: string; loopUrl: string }) {
     const a = audioRef.current;
@@ -371,6 +407,7 @@ export default function MusicianApp() {
           <Link href={typeof window !== 'undefined' && window.top !== window.self ? "/experiences/app" : "/"} className="ml-3 text-xs px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Home</Link>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2"><CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft ?? "-"}</span></div>
+            <button onClick={buyCredits} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Buy credits</button>
             <ToggleChip enabled={shareToForum} onClick={()=>setShareToForum((v)=>!v)} label="Share" icon={Megaphone} tooltip="Post new tracks to your Whop forum and ping followers." />
           </div>
         </div>
@@ -427,13 +464,17 @@ export default function MusicianApp() {
                       className="absolute -top-2 left-0 translate-y-[-100%] rounded-2xl border border-white/10 bg-[#0b0b12] shadow-2xl p-4 w-64"
                     >
                       <div className="font-medium mb-3">Number of Variants</div>
-                      <div className="grid grid-cols-4 gap-2">
-                        {[1,2,3,4].map((n)=> (
+                      <div className="grid grid-cols-5 gap-2">
+                        {Array.from({ length: 10 }, (_, idx) => idx + 1).map((n)=> (
                           <button
                             key={n}
                             onClick={()=>{
                               const cap = currentCaps();
-                              if (n > cap.maxBatch) { upgradeTo(n <= 4 ? "PRO" : "STUDIO"); return; }
+                              if (n > cap.maxBatch) {
+                                const target = n <= PLAN_CAPS.PRO.maxBatch ? "PRO" : "STUDIO";
+                                upgradeTo(target);
+                                return;
+                              }
                               setBatch(n); setShowVariants(false);
                             }}
                             className={`h-10 rounded-xl border ${batch===n?"bg-white/10 border-white":"bg-white/5 border-white/10 hover:bg-white/10"} ${n>currentCaps().maxBatch?"opacity-40 cursor-not-allowed":""}`}

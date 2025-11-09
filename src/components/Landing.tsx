@@ -127,9 +127,9 @@ export default function Landing({ experienceId }: Props) {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
-            {name:"Starter", price:"$29/mo", features:["150 credits","30s max","Loops" ]},
-            {name:"Pro", price:"$79/mo", features:["600 credits","Batch x4","Streaming preview"]},
-            {name:"Studio", price:"$199/mo", features:["2000 credits","Batch x10","Advanced plan editor"]},
+            {name:"Starter", price:"$29/mo", features:["150 credits/mo","30s max loops","Loops only" ]},
+            {name:"Pro", price:"$79/mo", features:["600 credits/mo","Batch up to 10","Stems + streaming preview"]},
+            {name:"Studio", price:"$199/mo", features:["2000 credits/mo","Team seats (x5)","Webhooks & API"]},
           ].map((p)=> (
             <div key={p.name} className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <div className="font-semibold">{p.name}</div>
@@ -181,5 +181,4 @@ export default function Landing({ experienceId }: Props) {
     </main>
   );
 }
-
 
