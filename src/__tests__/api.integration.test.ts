@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { NextResponse, NextRequest } from "next/server";
 import { Plan } from "@prisma/client";
 
+type AnalyticsArgs = [userId: string | null, type: string, payload?: Record<string, unknown>];
+
 const { analyticsSpy } = vi.hoisted(() => ({ analyticsSpy: vi.fn() }));
 
 vi.mock("@/lib/analytics", () => ({
-  recordAnalyticsEvent: (...args: any[]) => analyticsSpy(...args),
+  recordAnalyticsEvent: (...args: AnalyticsArgs) => analyticsSpy(...args),
 }));
 
 const mockDb = {
@@ -28,16 +30,19 @@ const mockDb = {
   events: [] as Array<{ userId: string; type: string }>,
 };
 
+type EventRecord = { userId: string; type: string; payloadJson?: unknown };
+type UserRecord = { id: string; whopUserId: string; plan: Plan; credits: number };
+
 const prismaMock = {
   event: {
     findFirst: vi.fn(async () => null),
-    create: vi.fn(async ({ data }: { data: any }) => {
+    create: vi.fn(async ({ data }: { data: EventRecord }) => {
       mockDb.events.push(data);
       return data;
     }),
   },
   user: {
-    update: vi.fn(async ({ where, data }: { where: { id: string }; data: any }) => {
+    update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<UserRecord> }) => {
       const user = mockDb.users.find((u) => u.id === where.id);
       if (!user) throw new Error("USER_NOT_FOUND");
       Object.assign(user, data);
@@ -48,7 +53,7 @@ const prismaMock = {
     upsert: vi.fn(async ({ where }: { where: { whopUserId: string } }) => mockDb.users.find((u) => u.whopUserId === where.whopUserId) ?? mockDb.users[0]),
   },
   job: {
-    upsert: vi.fn(async ({ create }: { create: any }) => ({ id: create.id, userId: create.userId })),
+    upsert: vi.fn(async ({ create }: { create: { id: string; userId: string } }) => ({ id: create.id, userId: create.userId })),
     findUnique: vi.fn(async () => ({ id: "job_123", userId: "user_db", status: "PROCESSING", payloadJson: {}, assets: [] })),
   },
   asset: {
@@ -105,7 +110,7 @@ vi.mock("next/server", async () => {
   return actual;
 });
 
-global.fetch = vi.fn(async () => new Response("file", { headers: { "Content-Type": "text/plain" } })) as any;
+global.fetch = vi.fn(async () => new Response("file", { headers: { "Content-Type": "text/plain" } })) as unknown as typeof globalThis.fetch;
 
 import { POST as composePost } from "../app/api/compose/route";
 import { GET as assetsGet } from "../app/api/assets/route";
@@ -137,7 +142,7 @@ describe("API integration", () => {
       headers: new Headers(),
     } as unknown as Request;
 
-    const response = (await composePost(req as any)) as NextResponse;
+    const response = (await composePost(req as unknown as NextRequest)) as NextResponse;
     const data = await response.json();
     expect(data).toMatchObject({ jobId: "job_123" });
     expect(analyticsSpy).toHaveBeenCalledWith("user_db", "generate_requested", expect.any(Object));
@@ -145,16 +150,16 @@ describe("API integration", () => {
 
   it("returns asset list via /api/assets", async () => {
     const req = { headers: new Headers() } as unknown as Request;
-    const response = (await assetsGet(req as any)) as NextResponse;
+    const response = (await assetsGet(req as unknown as NextRequest)) as NextResponse;
     const data = await response.json();
     expect(Array.isArray(data.assets)).toBe(true);
     expect(data.assets[0].wavUrl).toContain("https://signed/");
   });
 
   it("serves license downloads and logs analytics", async () => {
-    const req = { headers: new Headers() } as NextRequest;
+    const req = { headers: new Headers() } as unknown as NextRequest;
     const ctx = { params: Promise.resolve({ assetId: "asset_1" }) };
-    const response = await licensePost(req as any, ctx);
+    const response = await licensePost(req as NextRequest, ctx);
     const text = await response.text();
     expect(response.status).toBe(200);
     expect(text).toContain("file");
