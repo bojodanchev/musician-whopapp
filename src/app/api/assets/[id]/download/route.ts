@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getPrisma } from "@/lib/prisma";
 import { verifyWhopFromRequest } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
+import { recordAnalyticsEvent } from "@/lib/analytics";
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -39,6 +40,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     const ext = type === "stems" ? "zip" : key.endsWith(".mp3") ? "mp3" : key.endsWith(".wav") ? "wav" : "audio";
     const filename = `${filenameBase}_${type}.${ext}`;
 
+    await recordAnalyticsEvent(asset.userId, type === "stems" ? "download_stems" : "download_wav", {
+      assetId: asset.id,
+      format: type,
+    });
+
     return new Response(resp.body, {
       headers: {
         "Content-Type": type === "stems" ? "application/zip" : resp.headers.get("Content-Type") || "audio/mpeg",
@@ -50,4 +56,3 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     return new Response(msg, { status: 400 });
   }
 }
-

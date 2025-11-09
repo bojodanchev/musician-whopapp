@@ -7,6 +7,7 @@ import { getMusicClient } from "@/lib/music/elevenlabs";
 import { JobStatus, Plan } from "@prisma/client";
 import { fetchEntitledPlan } from "@/lib/entitlements";
 import { PLAN_BASELINE_CREDITS, PLAN_CAPS, PLAN_FEATURES, PlanName } from "@/lib/plans";
+import { recordAnalyticsEvent } from "@/lib/analytics";
 
 const composeSchema = z.object({
   vibe: z.string().min(1),
@@ -142,6 +143,13 @@ export async function POST(req: NextRequest) {
     }
 
     const promptText = parsed.vibe + (parsed.vocals ? ", with vocals" : "");
+    await recordAnalyticsEvent(user.id, "generate_requested", {
+      vibe: parsed.vibe,
+      duration: parsed.duration,
+      batch: parsed.batch,
+      stems: parsed.stems,
+      vocals: Boolean(parsed.vocals),
+    });
     const music = getMusicClient();
     const { jobId: remoteJobId } = await music.createGenerateJob({
       prompt: promptText,

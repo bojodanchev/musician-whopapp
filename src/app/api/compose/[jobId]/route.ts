@@ -5,6 +5,7 @@ import { getStorage } from "@/lib/storage/s3";
 import { normalizeLoudness, renderLoopVersion } from "@/lib/processing/audio";
 import { zipBuffers } from "@/lib/processing/zip";
 import { broadcastGenerationToCommunity } from "@/lib/community";
+import { recordAnalyticsEvent } from "@/lib/analytics";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await ctx.params;
@@ -96,6 +97,11 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: str
   }
 
   await prisma.job.update({ where: { id: jobId }, data: { status: "COMPLETED", completedAt: new Date() } });
+  await recordAnalyticsEvent(job.userId, "generate_completed", {
+    jobId,
+    assetCount: assetsOut.length,
+    duration: assetsOut[0]?.duration,
+  });
 
   const payload = (job.payloadJson ?? {}) as { shareToForum?: boolean; sharePosted?: boolean; prompt?: string; vibe?: string };
   if (payload.shareToForum && !payload.sharePosted) {

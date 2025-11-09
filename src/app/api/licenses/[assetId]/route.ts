@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getPrisma } from "@/lib/prisma";
 import { verifyWhopFromRequest } from "@/lib/auth";
 import { getStorage } from "@/lib/storage/s3";
+import { recordAnalyticsEvent } from "@/lib/analytics";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ assetId: string }> }) {
   try {
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ assetId: s
     const filenameBase = (asset.title || "license").replace(/[^a-z0-9-_]+/gi, "_").slice(0, 64);
     const filename = `${filenameBase}_license.txt`;
 
+    await recordAnalyticsEvent(asset.userId, "license_opened", { assetId: asset.id });
+
     return new Response(resp.body, {
       headers: {
         "Content-Type": "text/plain",
@@ -47,4 +50,3 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ assetId: s
     return new Response(msg, { status: 400 });
   }
 }
-
