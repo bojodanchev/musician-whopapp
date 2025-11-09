@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 
 export type AnalyticsEvent =
@@ -22,7 +23,8 @@ export async function recordAnalyticsEvent(userId: string | null, type: Analytic
   if (!KNOWN_EVENTS.has(type)) return;
   const prisma = getPrisma();
   try {
-    await prisma.event.create({ data: { userId, type, payloadJson: payload } });
+    const jsonPayload: Prisma.InputJsonValue = JSON.parse(JSON.stringify(payload));
+    await prisma.event.create({ data: { userId, type, payloadJson: jsonPayload } });
   } catch (err) {
     console.error("Failed to record analytics event", type, err);
   }
