@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight, Mic, RefreshCw } from "lucide-react";
+import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight, Mic, RefreshCw, Megaphone } from "lucide-react";
 import { useIframeSdk } from "@whop/react";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import PresetButtons, { PresetOption } from "@/components/PresetButtons";
@@ -48,6 +48,7 @@ export default function MusicianApp() {
   const [vocals, setVocals] = useState(false);
   const [reusePlan, setReusePlan] = useState(false);
   const [streamPreview, setStreamPreview] = useState(false);
+  const [shareToForum, setShareToForum] = useState(true);
   const [includeStems, setIncludeStems] = useState(false);
   const generateBtnRef = useRef<HTMLButtonElement | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -99,6 +100,17 @@ export default function MusicianApp() {
       window.location.assign(`/api/whop/subscribe?plan=${target}`);
     }
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("musician_share_forum");
+    if (stored !== null) setShareToForum(stored === "1");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("musician_share_forum", shareToForum ? "1" : "0");
+  }, [shareToForum]);
 
   useEffect(() => {
     // pick up preset query string if present
@@ -181,6 +193,7 @@ export default function MusicianApp() {
           vocals,
           reusePlan,
           streamingPreview: streamPreview,
+          shareToForum,
         }),
       });
       if (!resp.ok) {
@@ -258,6 +271,7 @@ export default function MusicianApp() {
           vocals,
           reusePlan,
           streamingPreview: false,
+          shareToForum,
         }),
       });
       if (!resp.ok) {
@@ -357,6 +371,7 @@ export default function MusicianApp() {
           <Link href={typeof window !== 'undefined' && window.top !== window.self ? "/experiences/app" : "/"} className="ml-3 text-xs px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Home</Link>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2"><CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft ?? "-"}</span></div>
+            <ToggleChip enabled={shareToForum} onClick={()=>setShareToForum((v)=>!v)} label="Share" icon={Megaphone} tooltip="Post new tracks to your Whop forum and ping followers." />
           </div>
         </div>
       </header>

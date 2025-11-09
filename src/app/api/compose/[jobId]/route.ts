@@ -4,6 +4,7 @@ import { getMusicClient } from "@/lib/music/elevenlabs";
 import { getStorage } from "@/lib/storage/s3";
 import { normalizeLoudness, renderLoopVersion } from "@/lib/processing/audio";
 import { zipBuffers } from "@/lib/processing/zip";
+import { broadcastGenerationToCommunity } from "@/lib/community";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await ctx.params;
@@ -95,6 +96,23 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ jobId: str
   }
 
   await prisma.job.update({ where: { id: jobId }, data: { status: "COMPLETED", completedAt: new Date() } });
+
+  const payload = (job.payloadJson ?? {}) as { shareToForum?: boolean; sharePosted?: boolean; prompt?: string; vibe?: string };
+  if (payload.shareToForum && !payload.sharePosted) {
+    try {
+      const user = await prisma.user.findUnique({ where: { id: job.userId }, select: { username: true, whopUserId: true } });
+      if (user) {
+        await broadcastGenerationToCommunity({
+          user,
+          prompt: payload.prompt ?? payload.vibe,
+          assets: assetsOut.map((asset) => ({ title: asset.title, duration: asset.duration })),
+        });
+        await prisma.job.update({ where: { id: jobId }, data: { payloadJson: { ...payload, sharePosted: true } } });
+      }
+    } catch (err) {
+      console.error("Failed to broadcast generation", err);
+    }
+  }
 
   return NextResponse.json({ assets: assetsOut });
 }

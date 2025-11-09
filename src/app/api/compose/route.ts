@@ -18,6 +18,7 @@ const composeSchema = z.object({
   vocals: z.boolean().optional(),
   reusePlan: z.boolean().optional(),
   streamingPreview: z.boolean().optional(),
+  shareToForum: z.boolean().optional(),
 });
 
 type ErrorBody = { error: string; requiredPlan?: "PRO" | "STUDIO"; message?: string; suggestedPrompt?: string };
@@ -169,30 +170,30 @@ export async function POST(req: NextRequest) {
 
     const promptText = parsed.vibe + (parsed.vocals ? ", with vocals" : "");
     const music = getMusicClient();
-    const { jobId: remoteJobId } = await music.createGenerateJob({
-      prompt: promptText,
-      bpm: parsed.bpm,
-      duration: parsed.duration,
-      structure: parsed.structure,
-      seed: parsed.seed,
-      stems: parsed.stems,
-      variations: parsed.batch,
-    });
+  const { jobId: remoteJobId } = await music.createGenerateJob({
+    prompt: promptText,
+    bpm: parsed.bpm,
+    duration: parsed.duration,
+    structure: parsed.structure,
+    seed: parsed.seed,
+    stems: parsed.stems,
+    variations: parsed.batch,
+  });
 
-    await prisma.job.upsert({
-      where: { id: remoteJobId },
-      create: {
-        id: remoteJobId,
-        userId: user.id,
-        status: JobStatus.QUEUED,
-        payloadJson: { ...parsed, prompt: promptText },
-      },
-      update: {
-        userId: user.id,
-        status: JobStatus.QUEUED,
-        payloadJson: { ...parsed, prompt: promptText },
-      },
-    });
+  await prisma.job.upsert({
+    where: { id: remoteJobId },
+    create: {
+      id: remoteJobId,
+      userId: user.id,
+      status: JobStatus.QUEUED,
+      payloadJson: { ...parsed, prompt: promptText, shareToForum: Boolean(parsed.shareToForum) },
+    },
+    update: {
+      userId: user.id,
+      status: JobStatus.QUEUED,
+      payloadJson: { ...parsed, prompt: promptText, shareToForum: Boolean(parsed.shareToForum) },
+    },
+  });
 
     const response = NextResponse.json({ jobId: remoteJobId, trialUsed: !hasAccess && trialEligible });
     try {
