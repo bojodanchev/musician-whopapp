@@ -1,22 +1,33 @@
 export const dynamic = "force-dynamic";
 import Link from "next/link";
+import { cookies, headers } from "next/headers";
 import { getPrisma } from "@/lib/prisma";
 import { Download, Shield } from "lucide-react";
 import { getStorage } from "@/lib/storage/s3";
 import { whopSdk } from "@/lib/whop";
-import { headers } from "next/headers";
 
 export default async function LibraryPage() {
   const prisma = getPrisma();
-  let whopUserId: string | null = null;
+  let userId: string | null = null;
   try {
     const hdrs = await headers();
     const verified = await whopSdk.verifyUserToken(hdrs);
-    whopUserId = verified.userId;
+    if (verified.userId) {
+      const dbUser = await prisma.user.findFirst({ where: { whopUserId: verified.userId } });
+      if (dbUser) userId = dbUser.id;
+    }
   } catch {}
 
   // Require authentication - redirect if no whopUserId
-  if (!whopUserId) {
+  if (!userId) {
+    const jar = await cookies();
+    const cookieUid = jar.get("musician_uid")?.value;
+    if (cookieUid) {
+      userId = cookieUid;
+    }
+  }
+
+  if (!userId) {
     return (
       <div className="space-y-6">
         <div className="text-center py-12">
@@ -28,8 +39,7 @@ export default async function LibraryPage() {
     );
   }
 
-  const where = { user: { whopUserId } };
-  const assets = await prisma.asset.findMany({ where, orderBy: { createdAt: "desc" }, take: 50 });
+  const assets = await prisma.asset.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 50 });
   let rows = assets.map((a) => ({
     ...a,
     wavSigned: { url: a.wavUrl },
@@ -82,4 +92,3 @@ export default async function LibraryPage() {
     </div>
   );
 }
-

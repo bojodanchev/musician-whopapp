@@ -5,7 +5,7 @@ export type PresetOption = {
   prompt: string;
   bpm: number;
   duration: number;
-  structure: string;
+  structure?: string;
   description: string;
 };
 

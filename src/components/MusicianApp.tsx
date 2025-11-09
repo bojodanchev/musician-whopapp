@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Music, PlayCircle, Download, CreditCard, Layers, ArrowLeftRight, Mic, RefreshCw, Megaphone } from "lucide-react";
 import { useIframeSdk } from "@whop/react";
-import OnboardingWizard from "@/components/OnboardingWizard";
+import OnboardingWizard, { OnboardingSelection } from "@/components/OnboardingWizard";
 import PresetButtons, { PresetOption } from "@/components/PresetButtons";
 import { PLAN_CAPS, PlanName } from "@/lib/plans";
 
@@ -392,9 +392,15 @@ export default function MusicianApp() {
       {showOnboarding && (
         <OnboardingWizard
           onClose={() => { localStorage.setItem("musician_onboarded", "1"); setShowOnboarding(false); }}
-          onComplete={(presetPrompt) => {
-            setPrompt(presetPrompt);
-            setTimeout(() => generateBtnRef.current?.focus(), 50);
+          onComplete={(selection: OnboardingSelection) => {
+            handlePresetPick({
+              name: "Custom moment",
+              prompt: selection.prompt,
+              bpm: selection.bpm,
+              duration: selection.duration,
+              structure: selection.structure,
+              description: "Personalized onboarding preset",
+            });
           }}
         />
       )}
@@ -405,6 +411,8 @@ export default function MusicianApp() {
           </div>
           <div className="font-semibold tracking-tight">Musician</div>
           <Link href={typeof window !== 'undefined' && window.top !== window.self ? "/experiences/app" : "/"} className="ml-3 text-xs px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Home</Link>
+          <Link href="/docs" className="text-xs px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Docs</Link>
+          <Link href="/library" className="text-xs px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Library</Link>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <div className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2"><CreditCard className="size-4" /> Credits: <span className="font-semibold">{creditsLeft ?? "-"}</span></div>
             <button onClick={buyCredits} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">Buy credits</button>
@@ -586,6 +594,9 @@ export default function MusicianApp() {
                 >
                   {isGenerating ? "Generating…" : "Generate"}
                 </button>
+                <div className="w-full text-right text-[11px] text-white/60">
+                  Every saved take includes a license.txt for social + ads use.
+                </div>
               </div>
             </div>
           </div>

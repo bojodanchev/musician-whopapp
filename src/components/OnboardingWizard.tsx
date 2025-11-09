@@ -2,9 +2,16 @@
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 
+export type OnboardingSelection = {
+  prompt: string;
+  bpm: number;
+  duration: number;
+  structure: string;
+};
+
 type Props = {
   onClose: () => void;
-  onComplete: (presetPrompt: string) => void;
+  onComplete: (selection: OnboardingSelection) => void;
 };
 
 export default function OnboardingWizard({ onClose, onComplete }: Props) {
@@ -17,10 +24,20 @@ export default function OnboardingWizard({ onClose, onComplete }: Props) {
   function next() { setStep((s) => s + 1); }
   function back() { setStep((s) => Math.max(0, s - 1)); }
 
+  const stylePresets: Record<string, { bpm: number; duration: number; structure: string }> = {
+    "Warm lofi": { bpm: 85, duration: 30, structure: "intro-loop" },
+    "Modern cinematic": { bpm: 120, duration: 45, structure: "build-drop-outro" },
+    "Trap energy": { bpm: 140, duration: 20, structure: "drop-outro" },
+    "Indie pop": { bpm: 105, duration: 30, structure: "intro-drop-outro" },
+    "Acoustic": { bpm: 95, duration: 35, structure: "intro-loop" },
+    "EDM": { bpm: 128, duration: 60, structure: "build-drop-outro" },
+  };
+
   function finish() {
     const parts = [occasion, style, vibe, name ? `with the name ${name}` : ""].filter(Boolean);
     const prompt = parts.join(", ");
-    onComplete(prompt);
+    const preset = stylePresets[style] ?? { bpm: 110, duration: 30, structure: "intro-drop-outro" };
+    onComplete({ prompt, ...preset });
     onClose();
   }
 
@@ -91,5 +108,4 @@ export default function OnboardingWizard({ onClose, onComplete }: Props) {
     </div>
   );
 }
-
 
